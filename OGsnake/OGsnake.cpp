@@ -1,9 +1,17 @@
 ﻿#define _CRT_SECURE_NO_WARNINGS
 #include "functions.h"
 
+struct Snake {
 
-void printInfo () {
-
+};
+void printInfo ( SDL_Surface * screen , SDL_Surface *charset, double worldTime, double fps, int czerwony , int niebieski, char* text ) {
+	SDLUtils::DrawRectangle ( screen , 4 , 4 , SCREEN_WIDTH - 8 , 36 , czerwony , niebieski );
+		//            "template for the second project, elapsed time = %.1lf s  %.0lf frames / s"
+	sprintf ( text , "Szablon drugiego zadania, czas trwania = %.1lf s  %.0lf klatek / s" , worldTime , fps );
+	SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , charset );
+	//	      "Esc - exit, \030 - faster, \031 - slower"
+	sprintf ( text , "Esc - wyjscie, \030 - przyspieszenie, \031 - zwolnienie" );
+	SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , charset );
 }
 
 void loop () {
@@ -118,14 +126,7 @@ int main( int argc , char ** argv )
 		};
 
 	// tekst informacyjny / info text
-		SDLUtils::DrawRectangle ( screen , 4 , 4 , SCREEN_WIDTH - 8 , 36 , czerwony , niebieski );
-		//            "template for the second project, elapsed time = %.1lf s  %.0lf frames / s"
-		sprintf ( text , "Szablon drugiego zadania, czas trwania = %.1lf s  %.0lf klatek / s" , worldTime , fps );
-		SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , charset );
-		//	      "Esc - exit, \030 - faster, \031 - slower"
-		sprintf ( text , "Esc - wyjscie, \030 - przyspieszenie, \031 - zwolnienie" );
-		SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , charset );
-
+		printInfo (screen, charset, worldTime, fps, czerwony, niebieski, text);
 		SDL_UpdateTexture ( scrtex , NULL , screen->pixels , screen->pitch );
 //		SDL_RenderClear(renderer);
 		SDL_RenderCopy ( renderer , scrtex , NULL , NULL );
