@@ -2,163 +2,210 @@
 #include "functions.h"
 
 struct Snake {
-
+	SDL_Surface * headUp , * headDown , * headLeft , * headRight;
+	SDL_Surface * bodyVertical, *bodyHorizontal;
+	SDL_Surface * tailUp , * tailDown , * tailLeft , * tailRight;
+	SDL_Surface * turnLeftUp , * turnLeftDown , * turnRightUp , * turnRightDown;
+	Vector<int>x , y;
+	int bodySize = 3;
 };
-void printInfo ( SDL_Surface * screen , SDL_Surface *charset, double worldTime, double fps, int czerwony , int niebieski, char* text ) {
-	SDLUtils::DrawRectangle ( screen , 4 , 4 , SCREEN_WIDTH - 8 , 36 , czerwony , niebieski );
-		//            "template for the second project, elapsed time = %.1lf s  %.0lf frames / s"
-	sprintf ( text , "Szablon drugiego zadania, czas trwania = %.1lf s  %.0lf klatek / s" , worldTime , fps );
-	SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , charset );
-	//	      "Esc - exit, \030 - faster, \031 - slower"
+
+struct Game {
+	int SCREEN_WIDTH = 480;
+	int SCREEN_HEIGHT = 516;
+	int RECTANGLE_HEIGHT = 36;
+	int startTime = 0;
+	int endTime = 0;
+	int score = 0;
+	int frames = 0;
+	int quit = 0;
+	int gameInitialize = 0;
+	int black , red , blue;
+	double deltaTime = 0;
+	double worldTime = 0;
+	double fpsTimer = 0;
+	double fps = 0;
+	SDL_Event event;
+	SDL_Surface * screen , * charset;
+	SDL_Texture * scrtex;
+	SDL_Window * window;
+	SDL_Renderer * renderer;
+};
+
+struct Food {
+	SDL_Surface * redFood , *blueFood;
+};
+
+struct Board {
+	
+	int gridSize = 24;
+	Vector<Vector<int>> area; // 0 -free , 1 - snake, 2 - food, 3 - wall
+};
+
+void printBoard ( Game & game ) {
+	SDLUtils::DrawRectangle ( game.screen , 0 , 0 , game.SCREEN_WIDTH , game.SCREEN_HEIGHT - game.RECTANGLE_HEIGHT , game.red , game.black );
+}
+
+void printInfo (Game&game) {
+	char text[128];
+	SDLUtils::DrawRectangle ( game.screen , 0 , 0 , game.SCREEN_WIDTH , game.RECTANGLE_HEIGHT , game.red , game.blue );
+	sprintf ( text , "Szablon drugiego zadania, czas trwania = %.1lf s  %.0lf klatek / s" , game.worldTime , game.fps );
+	SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , game.charset );
 	sprintf ( text , "Esc - wyjscie, \030 - przyspieszenie, \031 - zwolnienie" );
-	SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , charset );
+	SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , game.charset );
 }
 
 void loop () {
 
 }
 
+void settingColors (Game&game) {
+	game.black = SDL_MapRGB ( game.screen->format , 0x00 , 0x00 , 0x00 );
+	game.red = SDL_MapRGB ( game.screen->format , 0xFF , 0x00 , 0x00 );
+	game.blue = SDL_MapRGB ( game.screen->format , 0x11 , 0x11 , 0xCC );
+}
+
+void loadSnake (Game&game, Snake&snake) {
+	snake.headUp = SDL_LoadBMP ( "./snakebmp/headTop.bmp" );
+	snake.headDown = SDL_LoadBMP ( "./snakebmp/headDown.bmp" );
+	snake.headLeft = SDL_LoadBMP ( "./snakebmp/headLeft.bmp" );
+	snake.headRight = SDL_LoadBMP ( "./snakebmp/snakeRight.bmp" );
+	snake.tailUp = SDL_LoadBMP ( "./snakebmp/tailTop.bmp" );
+	snake.tailDown = SDL_LoadBMP ( "./snakebmp/tailDown.bmp" );
+	snake.tailLeft = SDL_LoadBMP ( "./snakebmp/tailLeft.bmp" );
+	snake.tailRight = SDL_LoadBMP ( "./snakebmp/tailRight.bmp" );
+	snake.bodyHorizontal = SDL_LoadBMP ( "./snakebmp/bodyHorizontally.bmp" );
+	snake.bodyVertical = SDL_LoadBMP ( "./snakebmp/bodyVertical.bmp" );
+	snake.turnLeftUp = SDL_LoadBMP ( "./snakebmp/turnLeftUp.bmp" );
+	snake.turnLeftDown = SDL_LoadBMP ( "./snakebmp/turnLeftDown.bmp" );
+	snake.turnRightUp = SDL_LoadBMP ( "./snakebmp/turnRightUp.bmp" );
+	snake.turnRightDown = SDL_LoadBMP ( "./snakebmp/turnRightDown.bmp" );
+
+	if ( snake.headUp == NULL || snake.headDown == NULL || snake.headLeft == NULL || snake.headRight == NULL||
+		 snake.tailUp == NULL || snake.tailDown == NULL || snake.tailLeft == NULL || snake.tailRight == NULL||
+		 snake.bodyHorizontal == NULL || snake.bodyVertical == NULL ||
+		 snake.turnLeftDown == NULL || snake.turnLeftUp == NULL || snake.turnRightDown == NULL || snake.turnRightUp == NULL) {
+		printf ( "loading snake error: %s\n" , SDL_GetError () );
+		SDL_FreeSurface ( game.charset );
+		SDL_FreeSurface ( game.screen );
+		SDL_DestroyTexture ( game.scrtex );
+		SDL_DestroyWindow ( game.window );
+		SDL_DestroyRenderer ( game.renderer );
+		SDL_Quit ();
+		exit(0);
+	};
+}
+
+void loadFoodCharset (Game&game, Food&food) {
+	game.charset = SDL_LoadBMP ( "./cs8x8.bmp" );
+	food.blueFood = SDL_LoadBMP ( "./snakebmp/blueFood.bmp" );
+	food.redFood = SDL_LoadBMP ( "./snakebmp/redFood.bmp" );
+	if ( game.charset == NULL || food.blueFood==NULL||food.redFood == NULL) {
+		printf ( "charset or food loading error: %s\n" , SDL_GetError () );
+		SDL_FreeSurface ( game.screen );
+		SDL_DestroyTexture ( game.scrtex );
+		SDL_DestroyWindow ( game.window );
+		SDL_DestroyRenderer ( game.renderer );
+		SDL_Quit ();
+		exit(0);
+	};
+	SDL_SetColorKey ( game.charset , true , 0x000000 );
+}
+
+void initialize ( Game & game ) {
+	game.gameInitialize = SDL_CreateWindowAndRenderer ( game.SCREEN_WIDTH , game.SCREEN_HEIGHT , 0 ,
+														&game.window , &game.renderer );
+	if ( game.gameInitialize != 0 ) {
+		SDL_Quit ();
+		printf ( "SDL_CreateWindowAndRenderer error: %s\n" , SDL_GetError () );
+		exit ( 0 );
+	};
+
+	SDL_SetHint ( SDL_HINT_RENDER_SCALE_QUALITY , "linear" );
+	SDL_RenderSetLogicalSize ( game.renderer , game.SCREEN_WIDTH , game.SCREEN_HEIGHT );
+	SDL_SetRenderDrawColor ( game.renderer , 0 , 0 , 0 , 255 );
+	SDL_SetWindowTitle ( game.window , "SNAKE BY KRZYSZTOF SZUDY s197771" );
+	game.screen = SDL_CreateRGBSurface ( 0 , game.SCREEN_WIDTH , game.SCREEN_HEIGHT , 32 , 0x00FF0000 , 0x0000FF00 ,
+										 0x000000FF , 0xFF000000 );
+	game.scrtex = SDL_CreateTexture ( game.renderer , SDL_PIXELFORMAT_ARGB8888 , SDL_TEXTUREACCESS_STREAMING , 
+									  game.SCREEN_WIDTH , game.SCREEN_HEIGHT );
+	SDL_ShowCursor ( SDL_DISABLE );
+
+}
+
 int main( int argc , char ** argv )
 {
-	int t1 , t2 , quit , frames , rc;
-	double delta , worldTime , fpsTimer , fps , distance , etiSpeed;
-	SDL_Event event;
-	SDL_Surface * screen , * charset;
-	SDL_Surface * monkey , * block , * black , * ladder;
-	SDL_Texture * scrtex;
-	SDL_Window * window;
-	SDL_Renderer * renderer;
-
+	Game game;
+	Snake snake;
+	Food food;
+	Board board;
 	if ( SDL_Init ( SDL_INIT_EVERYTHING ) != 0 ) {
 		printf ( "SDL_Init error: %s\n" , SDL_GetError () );
 		return 1;
 	}
+	initialize ( game );
+	loadFoodCharset ( game , food );
+	loadSnake ( game , snake );
+	settingColors ( game );
+	game.startTime = SDL_GetTicks ();
 
-// tryb pełnoekranowy / fullscreen mode
-//	rc = SDL_CreateWindowAndRenderer(0, 0, SDL_WINDOW_FULLSCREEN_DESKTOP,
-//	                                 &window, &renderer);
-	rc = SDL_CreateWindowAndRenderer ( SCREEN_WIDTH , SCREEN_HEIGHT , 0 ,
-									   &window , &renderer );
-	if ( rc != 0 ) {
-		SDL_Quit ();
-		printf ( "SDL_CreateWindowAndRenderer error: %s\n" , SDL_GetError () );
-		return 1;
-	};
+	while ( !game.quit ) {
+		game.endTime = SDL_GetTicks ();
+		game.deltaTime = ( game.endTime - game.startTime ) * 0.001;
+		game.startTime = game.endTime;
 
-	SDL_SetHint ( SDL_HINT_RENDER_SCALE_QUALITY , "linear" );
-	SDL_RenderSetLogicalSize ( renderer , SCREEN_WIDTH , SCREEN_HEIGHT );
-	SDL_SetRenderDrawColor ( renderer , 0 , 0 , 0 , 255 );
+		game.worldTime += game.deltaTime;
 
-	SDL_SetWindowTitle ( window , "DONKEY KONG" );
+		SDL_FillRect ( game.screen , NULL , game.black );
 
 
-	screen = SDL_CreateRGBSurface ( 0 , SCREEN_WIDTH , SCREEN_HEIGHT , 32 ,
-									0x00FF0000 , 0x0000FF00 , 0x000000FF , 0xFF000000 );
-
-	scrtex = SDL_CreateTexture ( renderer , SDL_PIXELFORMAT_ARGB8888 ,
-								 SDL_TEXTUREACCESS_STREAMING ,
-								 SCREEN_WIDTH , SCREEN_HEIGHT );
-
-
-	  // wyłączenie widoczności kursora myszy
-	SDL_ShowCursor ( SDL_DISABLE );
-
-	// wczytanie obrazka cs8x8.bmp
-	charset = SDL_LoadBMP ( "./cs8x8.bmp" );
-	if ( charset == NULL ) {
-		printf ( "SDL_LoadBMP(cs8x8.bmp) error: %s\n" , SDL_GetError () );
-		SDL_FreeSurface ( screen );
-		SDL_DestroyTexture ( scrtex );
-		SDL_DestroyWindow ( window );
-		SDL_DestroyRenderer ( renderer );
-		SDL_Quit ();
-		return 1;
-	};
-	SDL_SetColorKey ( charset , true , 0x000000 );
-
-	monkey = SDL_LoadBMP ( "./eti.bmp" );
-	if ( monkey == NULL ) {
-		printf ( "SDL_LoadBMP(eti.bmp) error: %s\n" , SDL_GetError () );
-		SDL_FreeSurface ( charset );
-		SDL_FreeSurface ( screen );
-		SDL_DestroyTexture ( scrtex );
-		SDL_DestroyWindow ( window );
-		SDL_DestroyRenderer ( renderer );
-		SDL_Quit ();
-		return 1;
-	};
-
-
-	char text[128];
-	int czarny = SDL_MapRGB ( screen->format , 0x00 , 0x00 , 0x00 );
-	int zielony = SDL_MapRGB ( screen->format , 0x00 , 0xFF , 0x00 );
-	int czerwony = SDL_MapRGB ( screen->format , 0xFF , 0x00 , 0x00 );
-	int niebieski = SDL_MapRGB ( screen->format , 0x11 , 0x11 , 0xCC );
-
-	t1 = SDL_GetTicks ();
-
-	frames = 0;
-	fpsTimer = 0;
-	fps = 0;
-	quit = 0;
-	worldTime = 0;
-	distance = 0;
-	etiSpeed = 0;
-
-	while ( !quit ) {
-		t2 = SDL_GetTicks ();
-		delta = ( t2 - t1 ) * 0.001;
-		t1 = t2;
-
-		worldTime += delta;
-
-		distance += etiSpeed * delta;
-
-		SDL_FillRect ( screen , NULL , czarny );
-
-		SDLUtils::DrawSurface ( screen , monkey , SCREEN_WIDTH / 2 + distance , SCREEN_HEIGHT / 2 );
-
-		fpsTimer += delta;
-		if ( fpsTimer > 0.5 ) {
-			fps = frames * 2;
-			frames = 0;
-			fpsTimer -= 0.5;
+		game.fpsTimer += game.deltaTime;
+		if ( game.fpsTimer > 0.5 ) {
+			game.fps = game.frames * 2;
+			game.frames = 0;
+			game.fpsTimer -= 0.5;
 		};
+		printInfo ( game );
+		//printBoard ( game );
+		SDLUtils::DrawSurface ( game.screen , snake.headUp , game.SCREEN_WIDTH / 2 , game.SCREEN_HEIGHT / 2 );
 
-	// tekst informacyjny / info text
-		printInfo (screen, charset, worldTime, fps, czerwony, niebieski, text);
+		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
+		SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , charset );
+		//	      "Esc - exit, \030 - faster, \031 - slower"
+		sprintf ( text , "Esc - wyjscie, \030 - przyspieszenie, \031 - zwolnienie" );
+		SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , charset );
+
+		SDL_UpdateTexture ( scrtex , NULL , screen->pixels , screen->pitch );
+		SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , charset );
+		//	      "Esc - exit, \030 - faster, \031 - slower"
+		sprintf ( text , "Esc - wyjscie, \030 - przyspieszenie, \031 - zwolnienie" );
+		SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , charset );
+
 		SDL_UpdateTexture ( scrtex , NULL , screen->pixels , screen->pitch );
 //		SDL_RenderClear(renderer);
-		SDL_RenderCopy ( renderer , scrtex , NULL , NULL );
-		SDL_RenderPresent ( renderer );
+		SDL_RenderCopy ( game.renderer , game.scrtex , NULL , NULL );
+		SDL_RenderPresent ( game.renderer );
 
 		// obsługa zdarzeń (o ile jakieś zaszły) / handling of events (if there were any)
-		while ( SDL_PollEvent ( &event ) ) {
-			switch ( event.type ) {
+		while ( SDL_PollEvent ( &game.event ) ) {
+			switch ( game.event.type ) {
 				case SDL_KEYDOWN:
-					if ( event.key.keysym.sym == SDLK_ESCAPE ) quit = 1;
-					else if ( event.key.keysym.sym == SDLK_RIGHT ) etiSpeed = 50;
-					else if ( event.key.keysym.sym == SDLK_LEFT ) etiSpeed = -50;
-					else if ( event.key.keysym.sym == SDLK_SPACE ) etiSpeed = -50;
-					else if ( event.key.keysym.sym == SDLK_n ) etiSpeed = -50;
-					break;
-				case SDL_KEYUP:
-					etiSpeed = 0;
+					if ( game.event.key.keysym.sym == SDLK_ESCAPE ) game.quit = 1;
 					break;
 				case SDL_QUIT:
-					quit = 1;
+					game.quit = 1;
 					break;
 			};
 		};
-		frames++;
+		game.frames++;
 	};
 
 // zwolnienie powierzchni / freeing all surfaces
-	SDL_FreeSurface ( charset );
-	SDL_FreeSurface ( screen );
-	SDL_DestroyTexture ( scrtex );
-	SDL_DestroyRenderer ( renderer );
-	SDL_DestroyWindow ( window );
+	SDL_FreeSurface ( game.charset );
+	SDL_FreeSurface ( game.screen );
+	SDL_DestroyTexture ( game.scrtex );
+	SDL_DestroyRenderer ( game.renderer );
+	SDL_DestroyWindow ( game.window );
 
 	SDL_Quit ();
 	return 0;
