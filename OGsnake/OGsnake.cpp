@@ -1,5 +1,6 @@
 ﻿#define _CRT_SECURE_NO_WARNINGS
 #include "functions.h"
+#include "Vector.h"
 
 struct Snake {
 	SDL_Surface * headUp , * headDown , * headLeft , * headRight;
@@ -43,15 +44,15 @@ struct Board {
 };
 
 void printBoard ( Game & game ) {
-	SDLUtils::DrawRectangle ( game.screen , 0 , 0 , game.SCREEN_WIDTH , game.SCREEN_HEIGHT - game.RECTANGLE_HEIGHT , game.red , game.black );
+	SDLUtils::DrawRectangle ( game.screen , 0 , game.RECTANGLE_HEIGHT , game.SCREEN_WIDTH , game.SCREEN_HEIGHT - game.RECTANGLE_HEIGHT , game.red , game.black );
 }
 
 void printInfo (Game&game) {
 	char text[128];
 	SDLUtils::DrawRectangle ( game.screen , 0 , 0 , game.SCREEN_WIDTH , game.RECTANGLE_HEIGHT , game.red , game.blue );
-	sprintf ( text , "Szablon drugiego zadania, czas trwania = %.1lf s  %.0lf klatek / s" , game.worldTime , game.fps );
+	sprintf ( text , "time = %.1lf s  fps = %.0lf " , game.worldTime , game.fps );
 	SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , game.charset );
-	sprintf ( text , "Esc - wyjscie, \030 - przyspieszenie, \031 - zwolnienie" );
+	sprintf ( text , "Esc - exit, w - up, a - left, d - right, s - down" );
 	SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , game.charset );
 }
 
@@ -166,22 +167,12 @@ int main( int argc , char ** argv )
 			game.fpsTimer -= 0.5;
 		};
 		printInfo ( game );
-		//printBoard ( game );
+		printBoard ( game );
 		SDLUtils::DrawSurface ( game.screen , snake.headUp , game.SCREEN_WIDTH / 2 , game.SCREEN_HEIGHT / 2 );
 
 		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
-		SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , charset );
-		//	      "Esc - exit, \030 - faster, \031 - slower"
-		sprintf ( text , "Esc - wyjscie, \030 - przyspieszenie, \031 - zwolnienie" );
-		SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , charset );
 
-		SDL_UpdateTexture ( scrtex , NULL , screen->pixels , screen->pitch );
-		SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , charset );
-		//	      "Esc - exit, \030 - faster, \031 - slower"
-		sprintf ( text , "Esc - wyjscie, \030 - przyspieszenie, \031 - zwolnienie" );
-		SDLUtils::DrawString ( screen , screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , charset );
-
-		SDL_UpdateTexture ( scrtex , NULL , screen->pixels , screen->pitch );
+		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
 //		SDL_RenderClear(renderer);
 		SDL_RenderCopy ( game.renderer , game.scrtex , NULL , NULL );
 		SDL_RenderPresent ( game.renderer );

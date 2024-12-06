@@ -36,7 +36,7 @@ Type Vector<Type>::get(int index) {
    if (index < currentSize) {
        return vector[index];
    }
-   return -1;
+   return Type();
 }
 
 template <typename Type>
@@ -68,5 +68,5 @@ template <typename Type>
 Vector<Type>::~Vector() {
    delete[] vector;
 }
-
+template class Vector<Vector<int>>;
 template class Vector<int>;
