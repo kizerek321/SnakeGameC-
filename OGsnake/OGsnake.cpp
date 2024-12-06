@@ -7,8 +7,12 @@ struct Snake {
 	SDL_Surface * bodyVertical, *bodyHorizontal;
 	SDL_Surface * tailUp , * tailDown , * tailLeft , * tailRight;
 	SDL_Surface * turnLeftUp , * turnLeftDown , * turnRightUp , * turnRightDown;
+	SDL_Surface * CurrentHead , * CurrentTail, *CurrentBody;
 	Vector<int>x , y;
 	int bodySize = 3;
+	int directionX = 0; // 1 - right, -1 - left
+	int directionY = -1; // 1 - down, -1 - up
+	int halfOfWidth = 12;
 };
 
 struct Game {
@@ -21,7 +25,7 @@ struct Game {
 	int frames = 0;
 	int quit = 0;
 	int gameInitialize = 0;
-	int black , red , blue;
+	int black , red , blue, grey;
 	double deltaTime = 0;
 	double worldTime = 0;
 	double fpsTimer = 0;
@@ -38,13 +42,20 @@ struct Food {
 };
 
 struct Board {
-	
+	int BOARD_ROWS = 20;
+	int BOARD_COLS = 20;
 	int gridSize = 24;
 	Vector<Vector<int>> area; // 0 -free , 1 - snake, 2 - food, 3 - wall
 };
 
-void printBoard ( Game & game ) {
+void printBoard ( Game & game, Board&board ) {
 	SDLUtils::DrawRectangle ( game.screen , 0 , game.RECTANGLE_HEIGHT , game.SCREEN_WIDTH , game.SCREEN_HEIGHT - game.RECTANGLE_HEIGHT , game.red , game.black );
+	for ( int row = 0; row <= board.BOARD_ROWS; row++ ) {
+		SDLUtils::DrawLine ( game.screen , game.RECTANGLE_HEIGHT , game.RECTANGLE_HEIGHT + board.gridSize + row*board.gridSize , board.gridSize * board.BOARD_COLS , 1 , 0 , game.grey );
+	}
+	for ( int col = 0; col <= board.BOARD_COLS; col++ ) {
+		SDLUtils::DrawLine ( game.screen , board.gridSize*col , game.RECTANGLE_HEIGHT , board.gridSize * board.BOARD_ROWS , 0 , 1 , game.grey );
+	}
 }
 
 void printInfo (Game&game) {
@@ -56,14 +67,86 @@ void printInfo (Game&game) {
 	SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , game.charset );
 }
 
-void loop () {
+void setSnake ( Snake & snake,Game&game ) {
+	snake.CurrentBody = snake.bodyVertical;
+	snake.CurrentHead = snake.headUp;
+	snake.CurrentTail = snake.tailUp;
+	for ( int i = 0; i < snake.bodySize; i++ ) {
+		snake.x.push ( game.SCREEN_WIDTH / 2 + snake.halfOfWidth);
+		snake.y.push ( game.SCREEN_HEIGHT / 2 + i*snake.CurrentBody->h + snake.halfOfWidth );
+	}
+}
 
+void moveSnake ( Snake & snake , Game & game ) {
+	for ( int i = snake.bodySize - 1; i > 0; i-- ) {
+		snake.x.push ( snake.x.get ( i - 1 ) );
+		snake.y.push ( snake.y.get ( i - 1 ) );
+	}
+	snake.x.push ( snake.x.get ( 0 ) + snake.directionX * snake.CurrentHead->w );
+	snake.y.push ( snake.y.get ( 0 ) + snake.directionY * snake.CurrentHead->h );
+}
+
+void printSnake ( Game & game , Snake & snake ) {
+	for ( int i = 0; i < snake.bodySize; i++ ) {
+		if ( i == 0 ) {
+			SDLUtils::DrawSurface ( game.screen , snake.CurrentHead , snake.x.get(i) , snake.y.get(i) );
+		}
+		else if ( i == snake.bodySize - 1 ) {
+			SDLUtils::DrawSurface ( game.screen , snake.CurrentTail , snake.x.get(i) , snake.y.get(i));
+		}
+		else {
+			SDLUtils::DrawSurface ( game.screen , snake.CurrentBody , snake.x.get(i) , snake.y.get (i));
+		}
+	}
+}
+
+void loop (Game&game, Snake&snake, Board&board) {
+	game.startTime = SDL_GetTicks ();
+	setSnake ( snake , game );
+	while ( !game.quit ) {
+		game.endTime = SDL_GetTicks ();
+		game.deltaTime = ( game.endTime - game.startTime ) * 0.001;
+		game.startTime = game.endTime;
+
+		game.worldTime += game.deltaTime;
+
+		SDL_FillRect ( game.screen , NULL , game.black );
+
+
+		game.fpsTimer += game.deltaTime;
+		if ( game.fpsTimer > 0.5 ) {
+			game.fps = game.frames * 2;
+			game.frames = 0;
+			game.fpsTimer -= 0.5;
+		};
+		printInfo ( game );
+		printBoard ( game, board );
+		printSnake ( game , snake );
+		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
+
+		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
+//		SDL_RenderClear(renderer);
+		SDL_RenderCopy ( game.renderer , game.scrtex , NULL , NULL );
+		SDL_RenderPresent ( game.renderer );
+		while ( SDL_PollEvent ( &game.event ) ) {
+			switch ( game.event.type ) {
+				case SDL_KEYDOWN:
+					if ( game.event.key.keysym.sym == SDLK_ESCAPE ) game.quit = 1;
+					break;
+				case SDL_QUIT:
+					game.quit = 1;
+					break;
+			};
+		};
+		game.frames++;
+	};
 }
 
 void settingColors (Game&game) {
 	game.black = SDL_MapRGB ( game.screen->format , 0x00 , 0x00 , 0x00 );
 	game.red = SDL_MapRGB ( game.screen->format , 0xFF , 0x00 , 0x00 );
 	game.blue = SDL_MapRGB ( game.screen->format , 0x11 , 0x11 , 0xCC );
+	game.grey = SDL_MapRGB ( game.screen->format , 128 , 128 , 128 ); // Grey with RGB (128,128,128)
 }
 
 void loadSnake (Game&game, Snake&snake) {
@@ -148,50 +231,7 @@ int main( int argc , char ** argv )
 	loadFoodCharset ( game , food );
 	loadSnake ( game , snake );
 	settingColors ( game );
-	game.startTime = SDL_GetTicks ();
-
-	while ( !game.quit ) {
-		game.endTime = SDL_GetTicks ();
-		game.deltaTime = ( game.endTime - game.startTime ) * 0.001;
-		game.startTime = game.endTime;
-
-		game.worldTime += game.deltaTime;
-
-		SDL_FillRect ( game.screen , NULL , game.black );
-
-
-		game.fpsTimer += game.deltaTime;
-		if ( game.fpsTimer > 0.5 ) {
-			game.fps = game.frames * 2;
-			game.frames = 0;
-			game.fpsTimer -= 0.5;
-		};
-		printInfo ( game );
-		printBoard ( game );
-		SDLUtils::DrawSurface ( game.screen , snake.headUp , game.SCREEN_WIDTH / 2 , game.SCREEN_HEIGHT / 2 );
-
-		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
-
-		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
-//		SDL_RenderClear(renderer);
-		SDL_RenderCopy ( game.renderer , game.scrtex , NULL , NULL );
-		SDL_RenderPresent ( game.renderer );
-
-		// obsługa zdarzeń (o ile jakieś zaszły) / handling of events (if there were any)
-		while ( SDL_PollEvent ( &game.event ) ) {
-			switch ( game.event.type ) {
-				case SDL_KEYDOWN:
-					if ( game.event.key.keysym.sym == SDLK_ESCAPE ) game.quit = 1;
-					break;
-				case SDL_QUIT:
-					game.quit = 1;
-					break;
-			};
-		};
-		game.frames++;
-	};
-
-// zwolnienie powierzchni / freeing all surfaces
+	loop ( game , snake, board );
 	SDL_FreeSurface ( game.charset );
 	SDL_FreeSurface ( game.screen );
 	SDL_DestroyTexture ( game.scrtex );
