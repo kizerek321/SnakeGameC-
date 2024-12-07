@@ -13,6 +13,8 @@ struct Snake {
 	int directionX = 0; // 1 - right, -1 - left
 	int directionY = -1; // 1 - down, -1 - up
 	int halfOfWidth = 12;
+	bool hitWall = false;
+	bool turn = false;
 };
 
 struct Game {
@@ -26,10 +28,13 @@ struct Game {
 	int quit = 0;
 	int gameInitialize = 0;
 	int black , red , blue, grey;
+	int points = 0;
 	double deltaTime = 0;
 	double worldTime = 0;
 	double fpsTimer = 0;
 	double fps = 0;
+	bool restart = true;
+	bool endGame = false;
 	SDL_Event event;
 	SDL_Surface * screen , * charset;
 	SDL_Texture * scrtex;
@@ -61,10 +66,12 @@ void printBoard ( Game & game, Board&board ) {
 void printInfo (Game&game) {
 	char text[128];
 	SDLUtils::DrawRectangle ( game.screen , 0 , 0 , game.SCREEN_WIDTH , game.RECTANGLE_HEIGHT , game.red , game.blue );
-	sprintf ( text , "time = %.1lf s  fps = %.0lf " , game.worldTime , game.fps );
+	sprintf ( text , "time = %.1lf s  %.0lf fps  points - %d" , game.worldTime , game.fps, game.points );
 	SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , game.charset );
-	sprintf ( text , "Esc - exit, w - up, a - left, d - right, s - down" );
+	sprintf ( text , "Esc - exit, n - new game, \x18 up, \x1B left, \x1A down, \x19 right" );
 	SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , game.charset );
+	printf ( "time: %.1lf s  \n" , game.worldTime);
+	printf ( "implemented points: 1,2,4" );
 }
 
 void setSnake ( Snake & snake,Game&game ) {
@@ -75,15 +82,115 @@ void setSnake ( Snake & snake,Game&game ) {
 		snake.x.push ( game.SCREEN_WIDTH / 2 + snake.halfOfWidth);
 		snake.y.push ( game.SCREEN_HEIGHT / 2 + i*snake.CurrentBody->h + snake.halfOfWidth );
 	}
+
+}
+
+void turnSnake ( Snake & snake , Game & game ) {
+	if ( snake.turn || snake.hitWall ) {
+		if ( snake.directionX == 1 && snake.directionY == 0 ) {
+			snake.CurrentHead = snake.headRight;
+			snake.CurrentTail = snake.tailRight;
+			snake.CurrentBody = snake.bodyHorizontal;
+		}
+		else if ( snake.directionX == -1 && snake.directionY == 0 ) {
+			snake.CurrentHead = snake.headLeft;
+			snake.CurrentTail = snake.tailLeft;
+			snake.CurrentBody = snake.bodyHorizontal;
+		}
+		else if ( snake.directionX == 0 && snake.directionY == 1 ) {
+			snake.CurrentHead = snake.headDown;
+			snake.CurrentTail = snake.tailDown;
+			snake.CurrentBody = snake.bodyVertical;
+		}
+		else if ( snake.directionX == 0 && snake.directionY == -1 ) {
+			snake.CurrentHead = snake.headUp;
+			snake.CurrentTail = snake.tailUp;
+			snake.CurrentBody = snake.bodyVertical;
+		}
+		snake.turn = false;
+		snake.hitWall = false;
+	}
+}
+
+void changeDirection ( Snake & snake , Game&game ) {
+	while ( SDL_PollEvent ( &game.event ) ) {
+		switch ( game.event.type ) {
+			case SDL_KEYDOWN:
+				switch ( game.event.key.keysym.sym ) {
+					case SDLK_UP:
+						if ( snake.directionY != 1 ) {
+							snake.directionX = 0;
+							snake.directionY = -1;
+							snake.turn = true;
+						}
+						break;
+					case SDLK_DOWN:
+						if ( snake.directionY != -1 ) {
+							snake.directionX = 0;
+							snake.directionY = 1;
+							snake.turn = true;
+						}
+						break;
+					case SDLK_LEFT:
+						if ( snake.directionX != 1 ) {
+							snake.directionX = -1;
+							snake.directionY = 0;
+							snake.turn = true;
+						}
+						break;
+					case SDLK_RIGHT:
+						if ( snake.directionX != -1 ) {
+							snake.directionX = 1;
+							snake.directionY = 0;
+							snake.turn = true;
+						}
+						break;
+					case SDLK_n:
+						game.endGame = true;
+						break;
+					case SDLK_ESCAPE:
+						game.quit = 1;
+						game.restart = false;
+						break;
+				}
+				break;
+		};
+	};
+}
+
+void ifHitWall ( Snake & snake , Game & game ) {
+	if ( snake.hitWall ) {
+		if ( snake.directionX == 1 ) {
+			snake.directionX = 0;
+			snake.directionY = 1;
+		}
+		else if ( snake.directionX == -1 ) {
+			snake.directionX = 0;
+			snake.directionY = -1;
+		}
+		else if ( snake.directionY == 1 ) {
+			snake.directionX = -1;
+			snake.directionY = 0;
+		}
+		else if ( snake.directionY == -1 ) {
+			snake.directionX = 1;
+			snake.directionY = 0;
+		}
+	}
 }
 
 void moveSnake ( Snake & snake , Game & game ) {
-	for ( int i = snake.bodySize - 1; i > 0; i-- ) {
-		snake.x.push ( snake.x.get ( i - 1 ) );
-		snake.y.push ( snake.y.get ( i - 1 ) );
+	if(!snake.hitWall){
+		snake.x.push ( snake.x.get ( 0 ) + snake.directionX , 0 );
+		snake.y.push ( snake.y.get ( 0 ) + snake.directionY , 0 );
+		for ( int i = snake.bodySize - 1; i > 0; i-- ) {
+			int moveX = snake.x.get ( i - 1 ) - snake.directionX * snake.CurrentBody->w;
+			int moveY = snake.y.get ( i - 1 ) - snake.directionY * snake.CurrentBody->h;
+			snake.x.push ( moveX , i );
+			snake.y.push ( moveY , i );
+		}
+		
 	}
-	snake.x.push ( snake.x.get ( 0 ) + snake.directionX * snake.CurrentHead->w );
-	snake.y.push ( snake.y.get ( 0 ) + snake.directionY * snake.CurrentHead->h );
 }
 
 void printSnake ( Game & game , Snake & snake ) {
@@ -100,10 +207,18 @@ void printSnake ( Game & game , Snake & snake ) {
 	}
 }
 
+void colision ( Snake & snake , Board & board, Game&game ) {
+	int snakeFrontX = snake.x.get ( 0 ) + snake.directionX * ( snake.CurrentHead->w / 2 );
+	int snakeFrontY = snake.y.get ( 0 ) + snake.directionY * ( snake.CurrentHead->h / 2 );
+	if ( snakeFrontY <= game.RECTANGLE_HEIGHT || snakeFrontX > game.SCREEN_WIDTH || snakeFrontX < 0 || snakeFrontY > game.SCREEN_HEIGHT ) {
+		snake.hitWall = true;
+	}
+}
+
 void loop (Game&game, Snake&snake, Board&board) {
 	game.startTime = SDL_GetTicks ();
 	setSnake ( snake , game );
-	while ( !game.quit ) {
+	while ( !game.quit && !game.endGame ) {
 		game.endTime = SDL_GetTicks ();
 		game.deltaTime = ( game.endTime - game.startTime ) * 0.001;
 		game.startTime = game.endTime;
@@ -122,22 +237,17 @@ void loop (Game&game, Snake&snake, Board&board) {
 		printInfo ( game );
 		printBoard ( game, board );
 		printSnake ( game , snake );
+		moveSnake ( snake , game );
+		colision ( snake , board , game );
+		ifHitWall ( snake , game );
 		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
 
 		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
 //		SDL_RenderClear(renderer);
 		SDL_RenderCopy ( game.renderer , game.scrtex , NULL , NULL );
 		SDL_RenderPresent ( game.renderer );
-		while ( SDL_PollEvent ( &game.event ) ) {
-			switch ( game.event.type ) {
-				case SDL_KEYDOWN:
-					if ( game.event.key.keysym.sym == SDLK_ESCAPE ) game.quit = 1;
-					break;
-				case SDL_QUIT:
-					game.quit = 1;
-					break;
-			};
-		};
+		changeDirection ( snake , game );
+		turnSnake ( snake , game );
 		game.frames++;
 	};
 }
@@ -217,28 +327,35 @@ void initialize ( Game & game ) {
 
 }
 
+void gameplay () {
+	Game game;
+	while(game.restart){
+		Snake snake;
+		Food food;
+		Board board;
+		if ( SDL_Init ( SDL_INIT_EVERYTHING ) != 0 ) {
+			printf ( "SDL_Init error: %s\n" , SDL_GetError () );
+			exit ( 0 );
+		}
+		initialize ( game );
+		loadFoodCharset ( game , food );
+		loadSnake ( game , snake );
+		settingColors ( game );
+		loop ( game , snake , board );
+		game.endGame = false;
+		SDL_FreeSurface ( game.charset );
+		SDL_FreeSurface ( game.screen );
+		SDL_DestroyTexture ( game.scrtex );
+		SDL_DestroyRenderer ( game.renderer );
+		SDL_DestroyWindow ( game.window );
+
+		SDL_Quit ();
+	}
+}
+
 int main( int argc , char ** argv )
 {
-	Game game;
-	Snake snake;
-	Food food;
-	Board board;
-	if ( SDL_Init ( SDL_INIT_EVERYTHING ) != 0 ) {
-		printf ( "SDL_Init error: %s\n" , SDL_GetError () );
-		return 1;
-	}
-	initialize ( game );
-	loadFoodCharset ( game , food );
-	loadSnake ( game , snake );
-	settingColors ( game );
-	loop ( game , snake, board );
-	SDL_FreeSurface ( game.charset );
-	SDL_FreeSurface ( game.screen );
-	SDL_DestroyTexture ( game.scrtex );
-	SDL_DestroyRenderer ( game.renderer );
-	SDL_DestroyWindow ( game.window );
-
-	SDL_Quit ();
+	gameplay ();
 	return 0;
 }
 
