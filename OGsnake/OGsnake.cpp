@@ -8,26 +8,30 @@ struct Snake {
 	SDL_Surface * tailUp , * tailDown , * tailLeft , * tailRight;
 	SDL_Surface * turnLeftUp , * turnLeftDown , * turnRightUp , * turnRightDown;
 	SDL_Surface * CurrentHead , * CurrentTail, *CurrentBody;
+	SDL_Surface * tailAfterTurn , * bodyAfterTurn;
 	Vector<int>x , y;
 	int bodySize = 3;
 	int directionX = 0; // 1 - right, -1 - left
 	int directionY = -1; // 1 - down, -1 - up
-	int halfOfWidth = 12;
+	int halfOfWidth = 0;
+	int pictureWidth = 0;
 	bool hitWall = false;
 	bool turn = false;
+	int turningX = 0;
+	int turningY = 0;
 };
 
 struct Game {
 	int SCREEN_WIDTH = 480;
-	int SCREEN_HEIGHT = 516;
-	int RECTANGLE_HEIGHT = 36;
+	int SCREEN_HEIGHT = 540;
+	int RECTANGLE_HEIGHT = 60;
 	int startTime = 0;
 	int endTime = 0;
 	int score = 0;
 	int frames = 0;
 	int quit = 0;
 	int gameInitialize = 0;
-	int black , red , blue, grey;
+	Uint32 black , red , blue, grey;
 	int points = 0;
 	double deltaTime = 0;
 	double worldTime = 0;
@@ -46,67 +50,67 @@ struct Food {
 	SDL_Surface * redFood , *blueFood;
 };
 
-struct Board {
-	int BOARD_ROWS = 20;
-	int BOARD_COLS = 20;
-	int gridSize = 24;
-	Vector<Vector<int>> area; // 0 -free , 1 - snake, 2 - food, 3 - wall
-};
-
-void printBoard ( Game & game, Board&board ) {
+void printBoard ( Game & game) {
 	SDLUtils::DrawRectangle ( game.screen , 0 , game.RECTANGLE_HEIGHT , game.SCREEN_WIDTH , game.SCREEN_HEIGHT - game.RECTANGLE_HEIGHT , game.red , game.black );
-	for ( int row = 0; row <= board.BOARD_ROWS; row++ ) {
-		SDLUtils::DrawLine ( game.screen , game.RECTANGLE_HEIGHT , game.RECTANGLE_HEIGHT + board.gridSize + row*board.gridSize , board.gridSize * board.BOARD_COLS , 1 , 0 , game.grey );
-	}
-	for ( int col = 0; col <= board.BOARD_COLS; col++ ) {
-		SDLUtils::DrawLine ( game.screen , board.gridSize*col , game.RECTANGLE_HEIGHT , board.gridSize * board.BOARD_ROWS , 0 , 1 , game.grey );
-	}
 }
 
 void printInfo (Game&game) {
 	char text[128];
 	SDLUtils::DrawRectangle ( game.screen , 0 , 0 , game.SCREEN_WIDTH , game.RECTANGLE_HEIGHT , game.red , game.blue );
-	sprintf ( text , "time = %.1lf s  %.0lf fps  points - %d" , game.worldTime , game.fps, game.points );
+	sprintf ( text , "time = %.1lf s  implemented points: 1,2,4" , game.worldTime);
 	SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , game.charset );
 	sprintf ( text , "Esc - exit, n - new game, \x18 up, \x1B left, \x1A down, \x19 right" );
 	SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , game.charset );
-	printf ( "time: %.1lf s  \n" , game.worldTime);
-	printf ( "implemented points: 1,2,4" );
+	sprintf ( text , "%.0lf fps  points - %d", game.fps , game.points );
+	SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 42 , text , game.charset );
 }
 
-void setSnake ( Snake & snake,Game&game ) {
+void setSnake ( Snake & snake, Game & game ) {
 	snake.CurrentBody = snake.bodyVertical;
 	snake.CurrentHead = snake.headUp;
 	snake.CurrentTail = snake.tailUp;
 	for ( int i = 0; i < snake.bodySize; i++ ) {
-		snake.x.push ( game.SCREEN_WIDTH / 2 + snake.halfOfWidth);
-		snake.y.push ( game.SCREEN_HEIGHT / 2 + i*snake.CurrentBody->h + snake.halfOfWidth );
+		snake.x.push ( game.SCREEN_WIDTH / 2 + snake.pictureWidth);
+		snake.y.push ( game.SCREEN_HEIGHT / 2 + i*snake.pictureWidth + snake.pictureWidth );
 	}
 
 }
 
+bool canTurn ( Snake & snake ) {
+	return true;
+}
+
+void changeDirection ( Snake & snake ) {
+	if ( snake.directionX == 1 && snake.directionY == 0 ) {
+		snake.CurrentHead = snake.headRight;
+		snake.CurrentTail = snake.tailRight;
+		snake.CurrentBody = snake.bodyHorizontal;
+	}
+	else if ( snake.directionX == -1 && snake.directionY == 0 ) {
+		snake.CurrentHead = snake.headLeft;
+		snake.CurrentTail = snake.tailLeft;
+		snake.CurrentBody = snake.bodyHorizontal;
+	}
+	else if ( snake.directionX == 0 && snake.directionY == 1 ) {
+		snake.CurrentHead = snake.headDown;
+		snake.CurrentTail = snake.tailDown;
+		snake.CurrentBody = snake.bodyVertical;
+	}
+	else if ( snake.directionX == 0 && snake.directionY == -1 ) {
+		snake.CurrentHead = snake.headUp;
+		snake.CurrentTail = snake.tailUp;
+		snake.CurrentBody = snake.bodyVertical;
+	}
+	snake.turningX = snake.x.get ( 0 );
+	snake.turningY = snake.y.get ( 0 );
+}
+
 void turnSnake ( Snake & snake , Game & game ) {
 	if ( snake.turn || snake.hitWall ) {
-		if ( snake.directionX == 1 && snake.directionY == 0 ) {
-			snake.CurrentHead = snake.headRight;
-			snake.CurrentTail = snake.tailRight;
-			snake.CurrentBody = snake.bodyHorizontal;
-		}
-		else if ( snake.directionX == -1 && snake.directionY == 0 ) {
-			snake.CurrentHead = snake.headLeft;
-			snake.CurrentTail = snake.tailLeft;
-			snake.CurrentBody = snake.bodyHorizontal;
-		}
-		else if ( snake.directionX == 0 && snake.directionY == 1 ) {
-			snake.CurrentHead = snake.headDown;
-			snake.CurrentTail = snake.tailDown;
-			snake.CurrentBody = snake.bodyVertical;
-		}
-		else if ( snake.directionX == 0 && snake.directionY == -1 ) {
-			snake.CurrentHead = snake.headUp;
-			snake.CurrentTail = snake.tailUp;
-			snake.CurrentBody = snake.bodyVertical;
-		}
+		changeDirection ( snake );
+		/*for ( int i = 1; i < snake.bodySize - 1; i++ ) {
+			
+		}*/
 		snake.turn = false;
 		snake.hitWall = false;
 	}
@@ -158,23 +162,63 @@ void changeDirection ( Snake & snake , Game&game ) {
 	};
 }
 
+int calculateDistanceWall ( Snake & snake , Game & game ) {
+	int currentX = snake.x.get ( 0 );
+	int currentY = snake.y.get ( 0 );
+	int distance = 0;
+	if ( snake.directionX == 1 ) {
+		distance = game.SCREEN_HEIGHT - currentY;
+	}
+	else if ( snake.directionX == -1 ) {
+		distance = currentY - game.RECTANGLE_HEIGHT;
+	}
+	else if ( snake.directionY == 1 ) {
+		distance = currentX;
+	}
+	else if ( snake.directionY == -1 ) {
+		distance = game.SCREEN_WIDTH - currentX;
+	}
+	return distance;
+}
+
 void ifHitWall ( Snake & snake , Game & game ) {
 	if ( snake.hitWall ) {
-		if ( snake.directionX == 1 ) {
-			snake.directionX = 0;
-			snake.directionY = 1;
+		int distance = calculateDistanceWall ( snake , game );
+		if(distance >= snake.pictureWidth){
+			if ( snake.directionX == 1 ) {
+				snake.directionX = 0;
+				snake.directionY = 1;
+			}
+			else if ( snake.directionX == -1 ) {
+				snake.directionX = 0;
+				snake.directionY = -1;
+			}
+			else if ( snake.directionY == 1 ) {
+				snake.directionX = -1;
+				snake.directionY = 0;
+			}
+			else if ( snake.directionY == -1 ) {
+				snake.directionX = 1;
+				snake.directionY = 0;
+			}
 		}
-		else if ( snake.directionX == -1 ) {
-			snake.directionX = 0;
-			snake.directionY = -1;
-		}
-		else if ( snake.directionY == 1 ) {
-			snake.directionX = -1;
-			snake.directionY = 0;
-		}
-		else if ( snake.directionY == -1 ) {
-			snake.directionX = 1;
-			snake.directionY = 0;
+		else {
+			if ( snake.directionX == 1 ) {
+				snake.directionX = 0;
+				snake.directionY = -1;
+			}
+			else if ( snake.directionX == -1 ) {
+				snake.directionX = 0;
+				snake.directionY = 1;
+			}
+			else if ( snake.directionY == 1 ) {
+				snake.directionX = 1;
+				snake.directionY = 0;
+			}
+			else if ( snake.directionY == -1 ) {
+				snake.directionX = -1;
+				snake.directionY = 0;
+			}
 		}
 	}
 }
@@ -184,8 +228,8 @@ void moveSnake ( Snake & snake , Game & game ) {
 		snake.x.push ( snake.x.get ( 0 ) + snake.directionX , 0 );
 		snake.y.push ( snake.y.get ( 0 ) + snake.directionY , 0 );
 		for ( int i = snake.bodySize - 1; i > 0; i-- ) {
-			int moveX = snake.x.get ( i - 1 ) - snake.directionX * snake.CurrentBody->w;
-			int moveY = snake.y.get ( i - 1 ) - snake.directionY * snake.CurrentBody->h;
+			int moveX = snake.x.get ( i - 1 ) - snake.directionX * snake.pictureWidth;
+			int moveY = snake.y.get ( i - 1 ) - snake.directionY * snake.pictureWidth;
 			snake.x.push ( moveX , i );
 			snake.y.push ( moveY , i );
 		}
@@ -207,7 +251,7 @@ void printSnake ( Game & game , Snake & snake ) {
 	}
 }
 
-void colision ( Snake & snake , Board & board, Game&game ) {
+void colision ( Snake & snake, Game&game ) {
 	int snakeFrontX = snake.x.get ( 0 ) + snake.directionX * ( snake.CurrentHead->w / 2 );
 	int snakeFrontY = snake.y.get ( 0 ) + snake.directionY * ( snake.CurrentHead->h / 2 );
 	if ( snakeFrontY <= game.RECTANGLE_HEIGHT || snakeFrontX > game.SCREEN_WIDTH || snakeFrontX < 0 || snakeFrontY > game.SCREEN_HEIGHT ) {
@@ -215,7 +259,7 @@ void colision ( Snake & snake , Board & board, Game&game ) {
 	}
 }
 
-void loop (Game&game, Snake&snake, Board&board) {
+void loop (Game&game, Snake&snake) {
 	game.startTime = SDL_GetTicks ();
 	setSnake ( snake , game );
 	while ( !game.quit && !game.endGame ) {
@@ -235,10 +279,10 @@ void loop (Game&game, Snake&snake, Board&board) {
 			game.fpsTimer -= 0.5;
 		};
 		printInfo ( game );
-		printBoard ( game, board );
+		printBoard ( game);
 		printSnake ( game , snake );
 		moveSnake ( snake , game );
-		colision ( snake , board , game );
+		colision ( snake , game );
 		ifHitWall ( snake , game );
 		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
 
@@ -256,7 +300,7 @@ void settingColors (Game&game) {
 	game.black = SDL_MapRGB ( game.screen->format , 0x00 , 0x00 , 0x00 );
 	game.red = SDL_MapRGB ( game.screen->format , 0xFF , 0x00 , 0x00 );
 	game.blue = SDL_MapRGB ( game.screen->format , 0x11 , 0x11 , 0xCC );
-	game.grey = SDL_MapRGB ( game.screen->format , 128 , 128 , 128 ); // Grey with RGB (128,128,128)
+	game.grey = SDL_MapRGB ( game.screen->format , 0x80 , 0x80 , 0x80 ); // Grey with RGB (128,128,128)
 }
 
 void loadSnake (Game&game, Snake&snake) {
@@ -288,6 +332,8 @@ void loadSnake (Game&game, Snake&snake) {
 		SDL_Quit ();
 		exit(0);
 	};
+	snake.halfOfWidth = snake.headUp->w/2;
+	snake.pictureWidth = snake.headUp->w;
 }
 
 void loadFoodCharset (Game&game, Food&food) {
@@ -328,11 +374,11 @@ void initialize ( Game & game ) {
 }
 
 void gameplay () {
-	Game game;
-	while(game.restart){
+	bool restart = true;
+	while(restart){
+		Game game;
 		Snake snake;
 		Food food;
-		Board board;
 		if ( SDL_Init ( SDL_INIT_EVERYTHING ) != 0 ) {
 			printf ( "SDL_Init error: %s\n" , SDL_GetError () );
 			exit ( 0 );
@@ -341,8 +387,9 @@ void gameplay () {
 		loadFoodCharset ( game , food );
 		loadSnake ( game , snake );
 		settingColors ( game );
-		loop ( game , snake , board );
+		loop ( game , snake );
 		game.endGame = false;
+		restart = game.restart;
 		SDL_FreeSurface ( game.charset );
 		SDL_FreeSurface ( game.screen );
 		SDL_DestroyTexture ( game.scrtex );
