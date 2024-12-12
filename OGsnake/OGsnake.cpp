@@ -8,23 +8,27 @@ struct Snake {
 	SDL_Surface * tailUp , * tailDown , * tailLeft , * tailRight;
 	SDL_Surface * turnLeftUp , * turnLeftDown , * turnRightUp , * turnRightDown;
 	SDL_Surface * CurrentHead , * CurrentTail, *CurrentBody;
-	SDL_Surface * tailAfterTurn , * bodyAfterTurn;
+	SDL_Surface * tailAfterTurn , * bodyAfterTurn, *bodyForTurning;
 	Vector<int>x , y;
 	int bodySize = 3;
-	int directionX = 0; // 1 - right, -1 - left
-	int directionY = -1; // 1 - down, -1 - up
+	int currentDirectionX = 0; // 1 - right, -1 - left
+	int currentDirectionY = -1; // 1 - down, -1 - up
+	int oldDirectionX = 0;
+	int oldDirectionY = 0;
 	int halfOfWidth = 0;
 	int pictureWidth = 0;
 	bool hitWall = false;
 	bool turn = false;
 	int turningX = 0;
 	int turningY = 0;
+	int snakeDelay = 3600;
 };
 
 struct Game {
 	int SCREEN_WIDTH = 480;
 	int SCREEN_HEIGHT = 540;
 	int RECTANGLE_HEIGHT = 60;
+	int lastSnakeMove = 0;
 	int startTime = 0;
 	int endTime = 0;
 	int score = 0;
@@ -80,39 +84,71 @@ bool canTurn ( Snake & snake ) {
 	return true;
 }
 
-void changeDirection ( Snake & snake ) {
-	if ( snake.directionX == 1 && snake.directionY == 0 ) {
+bool isInTurningArea ( Snake & snake, int index ) {
+	int turningX1 = snake.turningX - snake.halfOfWidth;
+	int turningX2 = snake.turningX + snake.halfOfWidth;
+	int turningY1 = snake.turningY - snake.halfOfWidth;
+	int turningY2 = snake.turningY + snake.halfOfWidth;
+
+	if ( snake.x.get ( index ) >= turningX1 && snake.x.get ( index ) <= turningX2 &&
+		 snake.y.get ( index ) >= turningY1 && snake.y.get ( index ) <= turningY2 ) {
+		return true;
+	}
+	return false;
+}
+
+void changeSkin ( Snake & snake ) {
+	if ( snake.currentDirectionX == 1 && snake.currentDirectionY == 0 ) {
 		snake.CurrentHead = snake.headRight;
 		snake.CurrentTail = snake.tailRight;
 		snake.CurrentBody = snake.bodyHorizontal;
+		if ( snake.oldDirectionY == 1 )
+			snake.bodyForTurning = snake.turnRightDown;
+		else
+			snake.bodyForTurning = snake.turnRightUp;
 	}
-	else if ( snake.directionX == -1 && snake.directionY == 0 ) {
+	else if ( snake.currentDirectionX == -1 && snake.currentDirectionY == 0 ) {
 		snake.CurrentHead = snake.headLeft;
 		snake.CurrentTail = snake.tailLeft;
 		snake.CurrentBody = snake.bodyHorizontal;
+		if ( snake.oldDirectionY == 1 )
+			snake.bodyForTurning = snake.turnLeftUp;
+		else
+			snake.bodyForTurning = snake.turnRightDown;
 	}
-	else if ( snake.directionX == 0 && snake.directionY == 1 ) {
+	else if ( snake.currentDirectionX == 0 && snake.currentDirectionY == 1 ) {
 		snake.CurrentHead = snake.headDown;
 		snake.CurrentTail = snake.tailDown;
 		snake.CurrentBody = snake.bodyVertical;
+		if ( snake.oldDirectionX == 1 )
+			snake.bodyForTurning = snake.turnRightDown;
+		else
+			snake.bodyForTurning = snake.turnLeftDown;
 	}
-	else if ( snake.directionX == 0 && snake.directionY == -1 ) {
+	else if ( snake.currentDirectionX == 0 && snake.currentDirectionY == -1 ) {
 		snake.CurrentHead = snake.headUp;
 		snake.CurrentTail = snake.tailUp;
 		snake.CurrentBody = snake.bodyVertical;
+		if ( snake.oldDirectionX == 1 )
+			snake.bodyForTurning = snake.turnLeftUp;
+		else
+			snake.bodyForTurning = snake.turnRightUp;
 	}
-	snake.turningX = snake.x.get ( 0 );
-	snake.turningY = snake.y.get ( 0 );
 }
 
 void turnSnake ( Snake & snake , Game & game ) {
 	if ( snake.turn || snake.hitWall ) {
-		changeDirection ( snake );
-		/*for ( int i = 1; i < snake.bodySize - 1; i++ ) {
-			
-		}*/
-		snake.turn = false;
-		snake.hitWall = false;
+		changeSkin ( snake );
+		for ( int i = 1; i < snake.bodySize - 1; i++ ) {
+			if ( isInTurningArea ( snake , i ) ) {
+				
+			}
+			else {
+				snake.turn = false;
+				snake.hitWall = false;
+			}
+		}
+		
 	}
 }
 
@@ -120,32 +156,36 @@ void changeDirection ( Snake & snake , Game&game ) {
 	while ( SDL_PollEvent ( &game.event ) ) {
 		switch ( game.event.type ) {
 			case SDL_KEYDOWN:
+				snake.oldDirectionX = snake.currentDirectionX;
+				snake.oldDirectionY = snake.currentDirectionY;
+				snake.turningX = snake.x.get ( 0 );
+				snake.turningY = snake.y.get ( 0 );
 				switch ( game.event.key.keysym.sym ) {
 					case SDLK_UP:
-						if ( snake.directionY != 1 ) {
-							snake.directionX = 0;
-							snake.directionY = -1;
+						if ( snake.currentDirectionY != 1 ) {
+							snake.currentDirectionX = 0;
+							snake.currentDirectionY = -1;
 							snake.turn = true;
 						}
 						break;
 					case SDLK_DOWN:
-						if ( snake.directionY != -1 ) {
-							snake.directionX = 0;
-							snake.directionY = 1;
+						if ( snake.currentDirectionY != -1 ) {
+							snake.currentDirectionX = 0;
+							snake.currentDirectionY = 1;
 							snake.turn = true;
 						}
 						break;
 					case SDLK_LEFT:
-						if ( snake.directionX != 1 ) {
-							snake.directionX = -1;
-							snake.directionY = 0;
+						if ( snake.currentDirectionX != 1 ) {
+							snake.currentDirectionX = -1;
+							snake.currentDirectionY = 0;
 							snake.turn = true;
 						}
 						break;
 					case SDLK_RIGHT:
-						if ( snake.directionX != -1 ) {
-							snake.directionX = 1;
-							snake.directionY = 0;
+						if ( snake.currentDirectionX != -1 ) {
+							snake.currentDirectionX = 1;
+							snake.currentDirectionY = 0;
 							snake.turn = true;
 						}
 						break;
@@ -166,16 +206,16 @@ int calculateDistanceWall ( Snake & snake , Game & game ) {
 	int currentX = snake.x.get ( 0 );
 	int currentY = snake.y.get ( 0 );
 	int distance = 0;
-	if ( snake.directionX == 1 ) {
-		distance = game.SCREEN_HEIGHT - currentY;
+	if ( snake.currentDirectionX == 1 ) {
+		distance = ( game.SCREEN_HEIGHT - currentY );
 	}
-	else if ( snake.directionX == -1 ) {
+	else if ( snake.currentDirectionX == -1 ) {
 		distance = currentY - game.RECTANGLE_HEIGHT;
 	}
-	else if ( snake.directionY == 1 ) {
+	else if ( snake.currentDirectionY == 1 ) {
 		distance = currentX;
 	}
-	else if ( snake.directionY == -1 ) {
+	else if ( snake.currentDirectionY == -1 ) {
 		distance = game.SCREEN_WIDTH - currentX;
 	}
 	return distance;
@@ -185,39 +225,39 @@ void ifHitWall ( Snake & snake , Game & game ) {
 	if ( snake.hitWall ) {
 		int distance = calculateDistanceWall ( snake , game );
 		if(distance >= snake.pictureWidth){
-			if ( snake.directionX == 1 ) {
-				snake.directionX = 0;
-				snake.directionY = 1;
+			if ( snake.currentDirectionX == 1 ) {
+				snake.currentDirectionX = 0;
+				snake.currentDirectionY = 1;
 			}
-			else if ( snake.directionX == -1 ) {
-				snake.directionX = 0;
-				snake.directionY = -1;
+			else if ( snake.currentDirectionX == -1 ) {
+				snake.currentDirectionX = 0;
+				snake.currentDirectionY = -1;
 			}
-			else if ( snake.directionY == 1 ) {
-				snake.directionX = -1;
-				snake.directionY = 0;
+			else if ( snake.currentDirectionY == 1 ) {
+				snake.currentDirectionX = -1;
+				snake.currentDirectionY = 0;
 			}
-			else if ( snake.directionY == -1 ) {
-				snake.directionX = 1;
-				snake.directionY = 0;
+			else if ( snake.currentDirectionY == -1 ) {
+				snake.currentDirectionX = 1;
+				snake.currentDirectionY = 0;
 			}
 		}
 		else {
-			if ( snake.directionX == 1 ) {
-				snake.directionX = 0;
-				snake.directionY = -1;
+			if ( snake.currentDirectionX == 1 ) {
+				snake.currentDirectionX = 0;
+				snake.currentDirectionY = -1;
 			}
-			else if ( snake.directionX == -1 ) {
-				snake.directionX = 0;
-				snake.directionY = 1;
+			else if ( snake.currentDirectionX == -1 ) {
+				snake.currentDirectionX = 0;
+				snake.currentDirectionY = 1;
 			}
-			else if ( snake.directionY == 1 ) {
-				snake.directionX = 1;
-				snake.directionY = 0;
+			else if ( snake.currentDirectionY == 1 ) {
+				snake.currentDirectionX = 1;
+				snake.currentDirectionY = 0;
 			}
-			else if ( snake.directionY == -1 ) {
-				snake.directionX = -1;
-				snake.directionY = 0;
+			else if ( snake.currentDirectionY == -1 ) {
+				snake.currentDirectionX = -1;
+				snake.currentDirectionY = 0;
 			}
 		}
 	}
@@ -225,15 +265,22 @@ void ifHitWall ( Snake & snake , Game & game ) {
 
 void moveSnake ( Snake & snake , Game & game ) {
 	if(!snake.hitWall){
-		snake.x.push ( snake.x.get ( 0 ) + snake.directionX , 0 );
-		snake.y.push ( snake.y.get ( 0 ) + snake.directionY , 0 );
-		for ( int i = snake.bodySize - 1; i > 0; i-- ) {
-			int moveX = snake.x.get ( i - 1 ) - snake.directionX * snake.pictureWidth;
-			int moveY = snake.y.get ( i - 1 ) - snake.directionY * snake.pictureWidth;
-			snake.x.push ( moveX , i );
-			snake.y.push ( moveY , i );
+		int deltaSnakeMove = ( SDL_GetTicks () - game.lastSnakeMove ) * 1000; //ms
+		if(deltaSnakeMove >= snake.snakeDelay){
+			snake.x.push ( snake.x.get ( 0 ) + snake.currentDirectionX , 0 );
+			snake.y.push ( snake.y.get ( 0 ) + snake.currentDirectionY , 0 );
+			for ( int i = snake.bodySize - 1; i > 0; i-- ) {
+				int moveX = snake.x.get ( i - 1 ) - snake.currentDirectionX * snake.pictureWidth;
+				int moveY = snake.y.get ( i - 1 ) - snake.currentDirectionY * snake.pictureWidth;
+				if ( isInTurningArea ( snake , i ) ) 					{
+					moveX = snake.x.get ( i ) - snake.oldDirectionX * snake.pictureWidth;
+					moveY = snake.y.get ( i ) - snake.oldDirectionY * snake.pictureWidth;
+				}
+				snake.x.push ( moveX , i );
+				snake.y.push ( moveY , i );
+			}
+			game.lastSnakeMove = SDL_GetTicks ();
 		}
-		
 	}
 }
 
@@ -246,14 +293,17 @@ void printSnake ( Game & game , Snake & snake ) {
 			SDLUtils::DrawSurface ( game.screen , snake.CurrentTail , snake.x.get(i) , snake.y.get(i));
 		}
 		else {
-			SDLUtils::DrawSurface ( game.screen , snake.CurrentBody , snake.x.get(i) , snake.y.get (i));
+			if(snake.turn &&  isInTurningArea(snake, i))
+				SDLUtils::DrawSurface ( game.screen , snake.bodyForTurning , snake.x.get ( i ) , snake.y.get ( i ) );
+			else
+				SDLUtils::DrawSurface ( game.screen , snake.CurrentBody , snake.x.get(i) , snake.y.get (i));
 		}
 	}
 }
 
 void colision ( Snake & snake, Game&game ) {
-	int snakeFrontX = snake.x.get ( 0 ) + snake.directionX * ( snake.CurrentHead->w / 2 );
-	int snakeFrontY = snake.y.get ( 0 ) + snake.directionY * ( snake.CurrentHead->h / 2 );
+	int snakeFrontX = snake.x.get ( 0 ) + snake.currentDirectionX * ( snake.CurrentHead->w / 2 );
+	int snakeFrontY = snake.y.get ( 0 ) + snake.currentDirectionY * ( snake.CurrentHead->h / 2 );
 	if ( snakeFrontY <= game.RECTANGLE_HEIGHT || snakeFrontX > game.SCREEN_WIDTH || snakeFrontX < 0 || snakeFrontY > game.SCREEN_HEIGHT ) {
 		snake.hitWall = true;
 	}
@@ -284,6 +334,7 @@ void loop (Game&game, Snake&snake) {
 		moveSnake ( snake , game );
 		colision ( snake , game );
 		ifHitWall ( snake , game );
+		turnSnake ( snake , game );
 		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
 
 		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
@@ -291,7 +342,6 @@ void loop (Game&game, Snake&snake) {
 		SDL_RenderCopy ( game.renderer , game.scrtex , NULL , NULL );
 		SDL_RenderPresent ( game.renderer );
 		changeDirection ( snake , game );
-		turnSnake ( snake , game );
 		game.frames++;
 	};
 }
