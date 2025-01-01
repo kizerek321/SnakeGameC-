@@ -68,5 +68,5 @@ template <typename Type>
 Vector<Type>::~Vector() {
    delete[] vector;
 }
-template class Vector<Vector<int>>;
+template class Vector<bool>;
 template class Vector<int>;
