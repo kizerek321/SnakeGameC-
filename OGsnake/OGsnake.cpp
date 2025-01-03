@@ -19,7 +19,8 @@ struct Snake {
 	bool turning = false;
 	int turningX = 0;
 	int turningY = 0;
-	int snakeDelay = 3600;
+	int snakeDelay = 8;
+	Vector<Turn>turns;
 };
 
 struct Game {
@@ -82,13 +83,14 @@ void setSnake ( Snake & snake, Game & game ) {
 }
 
 bool isInTurningArea ( Snake & snake, int index ) {
-	int turningX1 = snake.turningX - snake.halfOfWidth;
-	int turningX2 = snake.turningX + snake.halfOfWidth;
-	int turningY1 = snake.turningY - snake.halfOfWidth;
-	int turningY2 = snake.turningY + snake.halfOfWidth;
-
+	int turningX1 = snake.turns.get(0).x - snake.halfOfWidth;
+	int turningX2 = snake.turns.get ( 0 ).x + snake.halfOfWidth;
+	int turningY1 = snake.turns.get ( 0 ).y - snake.halfOfWidth;
+	int turningY2 = snake.turns.get ( 0 ).y + snake.halfOfWidth;
+	
 	if ( snake.x.get ( index ) >= turningX1 && snake.x.get ( index ) <= turningX2 &&
 		 snake.y.get ( index ) >= turningY1 && snake.y.get ( index ) <= turningY2 ) {
+		//printf ( "snake i: %d, x = %d, snakey = %d, turningY1 = %d, turningY2 = %d\n" ,index , snake.x.get ( index ) , snake.y.get ( index ) , turningY1 , turningY2 );
 		return true;
 	}
 	return false;
@@ -99,95 +101,133 @@ void changeSkin ( Snake & snake ) {
 		snake.CurrentHead = snake.headRight;
 		snake.CurrentTail = snake.tailRight;
 		snake.CurrentBody = snake.bodyHorizontal;
-		/*if ( snake.oldDirectionY == 1 )
+		if ( snake.turns.get(0).pastDY == 1 )
 			snake.bodyForTurning = snake.turnRightDown;
 		else
-			snake.bodyForTurning = snake.turnRightUp;*/
+			snake.bodyForTurning = snake.turnRightUp;
 	}
 	else if ( snake.directionX.get(0) == -1 && snake.directionY.get(0) == 0 ) {
 		snake.CurrentHead = snake.headLeft;
 		snake.CurrentTail = snake.tailLeft;
 		snake.CurrentBody = snake.bodyHorizontal;
-		/*if ( snake.oldDirectionY == 1 )
+		if ( snake.turns.get(0).pastDY == 1 )
 			snake.bodyForTurning = snake.turnLeftUp;
 		else
-			snake.bodyForTurning = snake.turnRightDown;*/
+			snake.bodyForTurning = snake.turnRightDown;
 	}
 	else if ( snake.directionX.get(0) == 0 && snake.directionY.get(0) == 1 ) {
 		snake.CurrentHead = snake.headDown;
 		snake.CurrentTail = snake.tailDown;
 		snake.CurrentBody = snake.bodyVertical;
-		/*if ( snake.oldDirectionX == 1 )
+		if ( snake.turns.get(0).pastDY == 1 )
 			snake.bodyForTurning = snake.turnRightDown;
 		else
-			snake.bodyForTurning = snake.turnLeftDown;*/
+			snake.bodyForTurning = snake.turnLeftDown;
 	}
 	else if ( snake.directionX.get(0) == 0 && snake.directionY.get (0) == -1 ) {
 		snake.CurrentHead = snake.headUp;
 		snake.CurrentTail = snake.tailUp;
 		snake.CurrentBody = snake.bodyVertical;
-		/*if ( snake.oldDirectionX == 1 )
+		if ( snake.turns.get(0).pastDY == 1 )
 			snake.bodyForTurning = snake.turnLeftUp;
 		else
-			snake.bodyForTurning = snake.turnRightUp;*/
+			snake.bodyForTurning = snake.turnRightUp;
 	}
+}
+
+bool canTurn ( Snake & snake ) {
+	int distanceX = snake.x.get ( 0 ) - snake.x.get ( 1 );
+	int distanceY = snake.y.get ( 0 ) - snake.y.get ( 1 );
+	if(distanceX < 0)
+		distanceX *= -1;
+	if ( distanceY < 0 )
+		distanceY *= -1;
+	if ( distanceX < snake.halfOfWidth * 2 && distanceY < snake.halfOfWidth * 2 )
+		return false;
+	return true;
 }
 
 void turnSnake ( Snake & snake , Game & game ) {
 	if ( snake.turning || snake.hitWall ) {
 		changeSkin ( snake );
-		for ( int i = 1; i < snake.bodySize - 1; i++ ) {
-			if ( isInTurningArea ( snake , i ) ) {
+		for ( int i = 1; i < snake.bodySize; i++ ) {
+			if (snake.turns.getCurrentSize() != 0 && 
+				snake.x.get ( i ) == snake.turns.get(0).x && snake.y.get (i) == snake.turns.get(0).y ) {
+				printf ( "i: %d, x: %d, y: %d\n",i , snake.x.get ( i ) , snake.y.get ( i ) );
 				snake.directionX.push ( snake.directionX.get ( i - 1 ) , i );
 				snake.directionY.push ( snake.directionY.get ( i - 1 ) , i );
+				snake.turn.push ( true , i );
+				if ( i == snake.bodySize - 1 ) {
+					snake.turns.pop ( 0 ); 
+					snake.turning = false;
+				}
+			}
+			else if ( isInTurningArea ( snake , i ) ) {
+				snake.turn.push ( true , i );
 			}
 			else {
-				if ( snake.turn.get ( i ) )
-					snake.turn.push(false, i);
-				if(snake.turn.get(snake.bodySize-1) ){
-					snake.turning = false;
-					snake.hitWall = false;
-				}
+				snake.turn.push ( false , i );
 			}
 		}
 		
 	}
 }
 
-void changeDirection ( Snake & snake , Game&game ) {
+void changeDirection ( Snake & snake , Game & game, int dir ) {
+	if(canTurn(snake)){
+		Turn newTurn = { snake.x.get ( 0 ),  snake.y.get ( 0 ), snake.directionX.get ( 0 ), snake.directionY.get ( 0 ) };
+		snake.turns.push ( newTurn );
+		switch ( dir ) {
+			case 0:
+				if ( snake.directionY.get ( 0 ) != 1 && snake.directionY.get ( 0 ) != -1 ) {
+					snake.directionX.push ( 0 , 0 );
+					snake.directionY.push ( -1 , 0 );
+					snake.turning = true;
+				}
+				break;
+			case 1:
+				if ( snake.directionY.get ( 0 ) != -1 && snake.directionY.get ( 0 ) != 1 ) {
+					snake.directionX.push ( 0 , 0 );
+					snake.directionY.push ( 1 , 0 );
+					snake.turning = true;
+				}
+				break;
+			case 2:
+				if ( snake.directionX.get ( 0 ) != 1 && snake.directionX.get ( 0 ) != -1 ) {
+					snake.directionX.push ( -1 , 0 );
+					snake.directionY.push ( 0 , 0 );
+					snake.turning = true;
+				}
+				break;
+			case 3:
+				if ( snake.directionX.get ( 0 ) != -1 && snake.directionX.get ( 0 ) != 1 ) {
+					snake.directionX.push ( 1 , 0 );
+					snake.directionY.push ( 0 , 0 );
+					snake.turning = true;
+				}
+				break;
+		}
+		if ( !snake.turning )
+			snake.turns.pop ( 0 );
+	}
+}
+
+void  getInput( Snake & snake , Game&game ) {
 	while ( SDL_PollEvent ( &game.event ) ) {
 		switch ( game.event.type ) {
 			case SDL_KEYDOWN:
-				snake.turningX = snake.x.get ( 0 );
-				snake.turningY = snake.y.get ( 0 );
 				switch ( game.event.key.keysym.sym ) {
 					case SDLK_UP:
-						if ( snake.directionY.get(0) != 1 ) {
-							snake.directionX.push( 0 , 0 );
-							snake.directionY.push ( -1 , 0 );
-							snake.turning = true;
-						}
+						changeDirection ( snake , game , 0 );
 						break;
 					case SDLK_DOWN:
-						if ( snake.directionY.get(0) != -1 ) {
-							snake.directionX.push ( 0 , 0 );
-							snake.directionY.push ( 1 , 0 );
-							snake.turning = true;
-						}
+						changeDirection ( snake , game , 1 );
 						break;
 					case SDLK_LEFT:
-						if ( snake.directionX.get(0) != 1 ) {
-							snake.directionX.push ( -1 , 0 );
-							snake.directionY.push ( 0 , 0 );
-							snake.turning = true;
-						}
+						changeDirection ( snake , game , 2 );
 						break;
 					case SDLK_RIGHT:
-						if ( snake.directionX.get(0) != -1 ) {
-							snake.directionX.push ( 1 , 0 );
-							snake.directionY.push ( 0 , 0 );
-							snake.turning = true;
-						}
+						changeDirection ( snake , game , 3 );
 						break;
 					case SDLK_n:
 						game.endGame = true;
@@ -202,7 +242,7 @@ void changeDirection ( Snake & snake , Game&game ) {
 	};
 }
 
-int calculateDistanceWall ( Snake & snake , Game & game ) {
+int calculateDistanceRightWall ( Snake & snake , Game & game ) { 
 	int currentX = snake.x.get ( 0 );
 	int currentY = snake.y.get ( 0 );
 	int distance = 0;
@@ -223,7 +263,10 @@ int calculateDistanceWall ( Snake & snake , Game & game ) {
 
 void ifHitWall ( Snake & snake , Game & game ) {
 	if ( snake.hitWall ) {
-		int distance = calculateDistanceWall ( snake , game );
+		snake.hitWall = false;
+		int distance = calculateDistanceRightWall ( snake , game );
+		Turn newTurn = { snake.x.get ( 0 ) , snake.y.get ( 0 ), snake.directionX.get(0), snake.directionY.get(0)};
+		snake.turns.push ( newTurn );
 		if(distance >= snake.pictureWidth){
 			if ( snake.directionX.get ( 0 ) == 1 ) {
 				snake.directionX.push(0,0);
@@ -265,19 +308,17 @@ void ifHitWall ( Snake & snake , Game & game ) {
 }
 
 void moveSnake ( Snake & snake , Game & game ) {
-	if(!snake.hitWall){
-		int deltaSnakeMove = ( SDL_GetTicks () - game.lastSnakeMove ) * 1000; //ms
-		if(deltaSnakeMove >= snake.snakeDelay){
-			snake.x.push ( snake.x.get ( 0 ) + snake.directionX.get(0) , 0);
-			snake.y.push ( snake.y.get ( 0 ) + snake.directionY.get(0) , 0);
-			for ( int i = snake.bodySize - 1; i > 0; i-- ) {
-				int moveX = snake.x.get ( i - 1 ) - snake.directionX.get(i) * snake.pictureWidth;
-				int moveY = snake.y.get ( i - 1 ) - snake.directionY.get(i) * snake.pictureWidth;
-				snake.x.push ( moveX , i );
-				snake.y.push ( moveY , i );
-			}
-			game.lastSnakeMove = SDL_GetTicks ();
+	int deltaSnakeMove = ( SDL_GetTicks () - game.lastSnakeMove ); //ms
+	if(deltaSnakeMove >= snake.snakeDelay){
+		snake.x.push ( snake.x.get ( 0 ) + snake.directionX.get(0) , 0);
+		snake.y.push ( snake.y.get ( 0 ) + snake.directionY.get(0) , 0);
+		for ( int i = snake.bodySize - 1; i > 0; i-- ) {
+			int moveX = snake.x.get ( i ) + snake.directionX.get(i);
+			int moveY = snake.y.get ( i ) + snake.directionY.get(i);
+			snake.x.push ( moveX , i );
+			snake.y.push ( moveY , i );
 		}
+		game.lastSnakeMove = SDL_GetTicks ();
 	}
 }
 
@@ -290,9 +331,9 @@ void printSnake ( Game & game , Snake & snake ) {
 			SDLUtils::DrawSurface ( game.screen , snake.CurrentTail , snake.x.get(i) , snake.y.get(i));
 		}
 		else {
-			/*if(snake.turn &&  isInTurningArea(snake, i))
+			if(snake.turn.get(i) )
 				SDLUtils::DrawSurface ( game.screen , snake.bodyForTurning , snake.x.get ( i ) , snake.y.get ( i ) );
-			else*/
+			else
 				SDLUtils::DrawSurface ( game.screen , snake.CurrentBody , snake.x.get(i) , snake.y.get (i));
 		}
 	}
@@ -327,18 +368,18 @@ void loop (Game&game, Snake&snake) {
 		};
 		printInfo ( game );
 		printBoard ( game);
-		printSnake ( game , snake );
-		moveSnake ( snake , game );
-		colision ( snake , game );
 		ifHitWall ( snake , game );
+		moveSnake ( snake , game );
+		getInput ( snake , game );
 		turnSnake ( snake , game );
+		printSnake ( game , snake );
+		colision ( snake , game );
 		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
 
 		SDL_UpdateTexture ( game.scrtex , NULL , game.screen->pixels , game.screen->pitch );
 //		SDL_RenderClear(renderer);
 		SDL_RenderCopy ( game.renderer , game.scrtex , NULL , NULL );
 		SDL_RenderPresent ( game.renderer );
-		changeDirection ( snake , game );
 		game.frames++;
 	};
 }
