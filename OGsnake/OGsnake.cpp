@@ -22,6 +22,7 @@ struct Snake {
 	int snakeDelay = 8;
 	Vector<Turn>turns;
 	bool dead = false;
+	int turnsTOdo = 0;
 };
 
 struct Game {
@@ -146,6 +147,18 @@ void changeSkin ( Snake & snake ) {
 	}
 }
 
+bool ifDirSame ( Snake & snake , int dir ) {
+	if ( snake.directionX.get ( 0 ) == 1 && dir == 3 )
+		return true;
+	else if ( snake.directionX.get ( 0 ) == -1 && dir == 2 )
+		return true;
+	else if ( snake.directionY.get ( 0 ) == 1 && dir == 1 )
+		return true;
+	else if ( snake.directionY.get ( 0 ) == -1 && dir == 0 )
+		return true;
+	return false;
+}
+
 bool canTurn ( Snake & snake , int dir ) { // dir=0 - up, 1 - down, 2 - left, 3 - right
 	int distanceX = snake.x.get ( 0 ) - snake.x.get ( 1 );
 	int distanceY = snake.y.get ( 0 ) - snake.y.get ( 1 );
@@ -153,14 +166,19 @@ bool canTurn ( Snake & snake , int dir ) { // dir=0 - up, 1 - down, 2 - left, 3 
 		distanceX *= -1;
 	if ( distanceY < 0 )
 		distanceY *= -1;
-	if ( dir == 0 || dir == 1 ) {
-		if ( distanceX <= snake.pictureWidth && snake.turns.getCurrentSize() > 1)
-			return false;
+	if ( ifDirSame ( snake , dir ) )
+		return false;
+	else {
+		if ( dir == 0 || dir == 1 ) {
+			if ( distanceX <= snake.pictureWidth && snake.turnsTOdo > 0 )
+				return false;
+		}
+		else if ( dir == 2 || dir == 3 ) {
+			if ( distanceY <= snake.pictureWidth && snake.turnsTOdo > 0 )
+				return false;
+		}
 	}
-	else if ( dir == 2 || dir == 3 ) {
-		if ( distanceY <= snake.pictureWidth && snake.turns.getCurrentSize () > 1 )
-			return false;
-	}
+	snake.turnsTOdo++;
 	return true;
 }
 
@@ -176,6 +194,7 @@ void turnSnake ( Snake & snake , Game & game ) {
 				if ( i == snake.bodySize - 1 ) {
 					snake.turns.pop ( 0 ); 
 					snake.turning = false;
+					snake.turnsTOdo--;
 				}
 			}
 			else if ( isInTurningArea ( snake , i ) ) {
@@ -193,6 +212,7 @@ void changeDirection ( Snake & snake , Game & game, int dir ) {
 	if(canTurn(snake, dir)){
 		Turn newTurn = { snake.x.get ( 0 ),  snake.y.get ( 0 ), snake.directionX.get ( 0 ), snake.directionY.get ( 0 ) };
 		snake.turns.push ( newTurn );
+		
 		switch ( dir ) {
 			case 0:
 				if ( snake.directionY.get ( 0 ) != 1 && snake.directionY.get ( 0 ) != -1 ) {
@@ -223,8 +243,6 @@ void changeDirection ( Snake & snake , Game & game, int dir ) {
 				}
 				break;
 		}
-		if ( !snake.turning )
-			snake.turns.pop ( 0 );
 	}
 }
 
