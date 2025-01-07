@@ -1,6 +1,7 @@
 ﻿#define _CRT_SECURE_NO_WARNINGS
 #include "functions.h"
 #include "Vector.h"
+#include <iostream>
 
 struct Snake {
 	SDL_Surface * headUp , * headDown , * headLeft , * headRight;
@@ -23,6 +24,8 @@ struct Snake {
 	Vector<Turn>turns;
 	bool dead = false;
 	int turnsTOdo = 0;
+	bool eatenBlueFood = false;
+	bool eatenRedFood = false;
 };
 
 struct Game {
@@ -170,11 +173,11 @@ bool canTurn ( Snake & snake , int dir ) { // dir=0 - up, 1 - down, 2 - left, 3 
 		return false;
 	else {
 		if ( dir == 0 || dir == 1 ) {
-			if ( distanceX <= snake.pictureWidth && snake.turnsTOdo > 0 )
+			if ( distanceX < snake.pictureWidth )
 				return false;
 		}
 		else if ( dir == 2 || dir == 3 ) {
-			if ( distanceY <= snake.pictureWidth && snake.turnsTOdo > 0 )
+			if ( distanceY < snake.pictureWidth )
 				return false;
 		}
 	}
@@ -187,7 +190,7 @@ void turnSnake ( Snake & snake , Game & game ) {
 		changeSkin ( snake );
 		for ( int i = 1; i < snake.bodySize; i++ ) {
 			if (snake.turns.getCurrentSize() != 0 && 
-				snake.x.get ( i ) == snake.turns.get(0).x && snake.y.get (i) == snake.turns.get(0).y ) {
+				snake.x.get ( i ) == snake.turns.get(snake.turnsTOdo - 1).x && snake.y.get (i) == snake.turns.get(snake.turnsTOdo - 1).y ) {
 				snake.directionX.push ( snake.directionX.get ( i - 1 ) , i );
 				snake.directionY.push ( snake.directionY.get ( i - 1 ) , i );
 				snake.turn.push ( true , i );
@@ -338,6 +341,7 @@ void ifHitWall ( Snake & snake , Game & game ) {
 		int distance = calculateDistanceRightWall ( snake , game );
 		Turn newTurn = { snake.x.get ( 0 ) , snake.y.get ( 0 ), snake.directionX.get(0), snake.directionY.get(0)};
 		snake.turns.push ( newTurn );
+		snake.turnsTOdo++;
 		if(distance >= snake.pictureWidth){
 			if ( snake.directionX.get ( 0 ) == 1 ) {
 				snake.directionX.push(0,0);
@@ -420,6 +424,75 @@ void colision ( Snake & snake, Game&game ) {
 	}
 }
 
+bool foodSpawnInSnake ( Snake & snake , BlueFood & blueFood ) {
+	for ( int i = 0; i < snake.bodySize; i++ ) {
+		int snakeX1 = snake.x.get ( i ) - snake.halfOfWidth;
+		int snakeX2 = snake.x.get ( i ) + snake.halfOfWidth;
+		int snakeY1 = snake.y.get ( i ) - snake.halfOfWidth;
+		int snakeY2 = snake.y.get ( i ) + snake.halfOfWidth;
+		int foodX1 = blueFood.x - blueFood.picture->w / 2;
+		int foodX2 = blueFood.x + blueFood.picture->w / 2;
+		int foodY1 = blueFood.y - blueFood.picture->h / 2;
+		int foodY2 = blueFood.y + blueFood.picture->h / 2;
+		if ( snakeX1 <= foodX2 && snakeX2 >= foodX1 && snakeY1 <= foodY2 && snakeY2 >= foodY1 ) {
+			return true;
+		}
+	}
+	return false;
+}
+void spawnBlueFood ( Game & game , BlueFood & blueFood , Snake&snake) {
+	if ( blueFood.eaten || blueFood.number == 0 ) {
+		bool spawned = false;
+		while(!spawned){
+			blueFood.x = rand () % ( game.SCREEN_WIDTH - 2 * blueFood.picture->w ) + blueFood.picture->w;
+			blueFood.y = rand () % ( game.SCREEN_HEIGHT - game.RECTANGLE_HEIGHT - 2 * blueFood.picture->h ) + game.RECTANGLE_HEIGHT + blueFood.picture->h;
+			if( !foodSpawnInSnake(snake, blueFood))
+				spawned = true;
+		}
+		blueFood.eaten = false;
+		blueFood.number = 1;
+	}
+}
+
+void blueFoodEaten ( Snake & snake , BlueFood & blueFood , Game & game ) {
+	int snakeFrontX = snake.x.get ( 0 ) + snake.directionX.get ( 0 ) * ( snake.CurrentHead->w / 2 );
+	int snakeFrontY = snake.y.get ( 0 ) + snake.directionY.get ( 0 ) * ( snake.CurrentHead->h / 2 );
+	int foodX1 = blueFood.x - blueFood.picture->w / 2;
+	int foodX2 = blueFood.x + blueFood.picture->w / 2;
+	int foodY1 = blueFood.y - blueFood.picture->h / 2;
+	int foodY2 = blueFood.y + blueFood.picture->h / 2;
+	if ( snakeFrontX >= foodX1 && snakeFrontX <= foodX2 && snakeFrontY >= foodY1 && snakeFrontY <= foodY2 ) {
+		blueFood.eaten = true;
+		blueFood.number = 0;
+		snake.bodySize++;
+		game.points++;
+		snake.eatenBlueFood = true;
+	}
+}
+
+void reSizeSnake ( Snake & snake ) {
+	if(snake.eatenBlueFood){
+		snake.eatenBlueFood = false;
+		int CtailX = snake.x.get ( snake.bodySize - 2 ); // current tail's x,y
+		int CtailY = snake.y.get ( snake.bodySize - 2 ); // new body will take them
+		int newTailx = CtailX - snake.directionX.get ( snake.bodySize - 2 ) * snake.pictureWidth;
+		int newTaily = CtailY - snake.directionY.get ( snake.bodySize - 2 ) * snake.pictureWidth;
+		snake.x.push ( newTailx );
+		snake.y.push ( newTaily );
+		snake.directionX.push ( snake.directionX.get ( snake.bodySize - 2 ) );
+		snake.directionY.push ( snake.directionY.get ( snake.bodySize - 2 ) );
+		snake.turn.push ( snake.turn.get ( snake.bodySize - 1 ) );
+	}
+}
+
+void printFood ( Game & game , BlueFood & blueFood , RedFood & redFood ) {
+	if ( !blueFood.eaten )
+		SDLUtils::DrawSurface ( game.screen , blueFood.picture , blueFood.x , blueFood.y );
+	if ( !redFood.eaten )
+		SDLUtils::DrawSurface ( game.screen , redFood.picture , redFood.x , redFood.y );
+}
+
+
 void loop (Game&game, Snake&snake, BlueFood&blueFood, RedFood&redFood) {
 	game.startTime = SDL_GetTicks ();
 	setSnake ( snake , game );
@@ -441,8 +514,12 @@ void loop (Game&game, Snake&snake, BlueFood&blueFood, RedFood&redFood) {
 		};
 		printInfo ( game );
 		printBoard ( game);
+		spawnBlueFood ( game , blueFood , snake);
+		printFood ( game , blueFood , redFood );
 		ifHitWall ( snake , game );
 		moveSnake ( snake , game );
+		blueFoodEaten ( snake , blueFood , game );
+		reSizeSnake ( snake );
 		getInput ( snake , game );
 		turnSnake ( snake , game );
 		printSnake ( game , snake );
