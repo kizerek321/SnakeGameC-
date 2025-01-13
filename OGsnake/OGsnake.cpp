@@ -54,6 +54,9 @@ struct Game {
 	SDL_Texture * scrtex;
 	SDL_Window * window;
 	SDL_Renderer * renderer;
+	double lastSpeedchange = 0;
+	const double speedUpInterval = 5.0;
+	const double speedUpValue = 0.01;
 };
 
 struct BlueFood {
@@ -65,9 +68,10 @@ struct BlueFood {
 
 struct RedFood {
 	SDL_Surface * picture;
-	bool eaten = false;
-	int number = 0;
+	bool eaten = true;
 	int x , y;
+	double spawnTime = 0.0;
+	double spawnInterval = 5.0;
 };
 
 void printBoard ( Game & game) {
@@ -189,7 +193,7 @@ bool canTurn ( Snake & snake , int dir ) { // dir=0 - up, 1 - down, 2 - left, 3 
 	for ( int i = 1; i < snake.bodySize; i++ ) {
 		snake.turnsTOdo.push ( num, i );
 	}
-	snake.numOfHeadTurns--;
+	snake.numOfHeadTurns = num - 1;
 	return true;
 }
 
@@ -203,7 +207,7 @@ void turnSnake ( Snake & snake , Game & game ) {
 					snake.directionX.push ( snake.directionX.get ( i - 1 ) , i );
 					snake.directionY.push ( snake.directionY.get ( i - 1 ) , i );
 					snake.turn.push ( true , i );
-					snake.turnsTOdo.push ( snake.turnsTOdo.get(i) - 1);
+					snake.turnsTOdo.push ( snake.turnsTOdo.get(i) - 1, i);
 					snake.alreadyTurned.push ( true , i );
 					if ( i == snake.bodySize - 1 ) {
 						snake.turns.pop ( 0 ); 
@@ -220,9 +224,6 @@ void turnSnake ( Snake & snake , Game & game ) {
 					snake.alreadyTurned.push ( false , i );
 				snake.turn.push ( false , i );
 			}
-		}
-		for ( int i = 0; i < snake.bodySize; i++ ) {
-			printf ( "%d" , snake.turn.get ( i ) );
 		}
 	}
 }
@@ -357,47 +358,41 @@ void ifHitWall ( Snake & snake , Game & game ) {
 		int distance = calculateDistanceRightWall ( snake , game );
 		Turn newTurn = { snake.x.get ( 0 ) , snake.y.get ( 0 ), snake.directionX.get(0), snake.directionY.get(0)};
 		snake.turns.push ( newTurn );
-		snake.numOfHeadTurns++;
+		/*snake.numOfHeadTurns++;
 		int num = snake.numOfHeadTurns;
 		for ( int i = 1; i < snake.bodySize; i++ ) {
 			snake.turnsTOdo.push (num, i);
-		}
+		}*/
+		int dir = 0;
 		if(distance >= snake.pictureWidth){
 			if ( snake.directionX.get ( 0 ) == 1 ) {
-				snake.directionX.push(0,0);
-				snake.directionY.push(1,0);
+				dir = 1;
 			}
 			else if ( snake.directionX.get ( 0 ) == -1 ) {
-				snake.directionX.push ( 0 , 0 );
-				snake.directionY.push ( -1 , 0 );
+				dir = 0;
 			}
 			else if ( snake.directionY.get ( 0 ) == 1 ) {
-				snake.directionX.push ( -1 , 0 );
-				snake.directionY.push ( 0 , 0 );
+				dir = 2;
 			}
 			else if ( snake.directionY.get ( 0 ) == -1 ) {
-				snake.directionX.push ( 1 , 0 );
-				snake.directionY.push ( 0 , 0 );
+				dir = 3;
 			}
 		}
 		else {
 			if ( snake.directionX.get(0) == 1 ) {
-				snake.directionX.push ( 0 , 0 );
-				snake.directionY.push ( -1 , 0 );
+				dir = 0;
 			}
 			else if ( snake.directionX.get(0) == -1 ) {
-				snake.directionX.push ( 0 , 0 );
-				snake.directionY.push ( 1 , 0 );
+				dir = 1;
 			}
 			else if ( snake.directionY.get(0) == 1 ) {
-				snake.directionX.push ( 1 , 0 );
-				snake.directionY.push ( 0 , 0 );
+				dir = 3;
 			}
 			else if ( snake.directionY.get(0) == -1 ) {
-				snake.directionX.push ( -1 , 0 );
-				snake.directionY.push ( 0 , 0 );
+				dir = 2;
 			}
 		}
+		changeDirection ( snake , game , dir );
 		snake.turning = true;
 	}
 }
@@ -463,6 +458,7 @@ bool foodSpawnInSnake ( Snake & snake , BlueFood & blueFood ) {
 	}
 	return false;
 }
+
 void spawnBlueFood ( Game & game , BlueFood & blueFood , Snake&snake) {
 	if ( blueFood.eaten || blueFood.number == 0 ) {
 		bool spawned = false;
@@ -497,6 +493,64 @@ void blueFoodEaten ( Snake & snake , BlueFood & blueFood , Game & game ) {
 	}
 }
 
+void spawnRedFood ( Game & game , RedFood & redFood ) {
+	if ( redFood.eaten && SDL_GetTicks() * 0.001 - redFood.spawnTime > redFood.spawnInterval ) {
+		redFood.x = rand () % ( game.SCREEN_WIDTH - 2 * redFood.picture->w ) + redFood.picture->w;
+		redFood.y = rand () % ( game.SCREEN_HEIGHT - game.RECTANGLE_HEIGHT - 2 * redFood.picture->h ) + game.RECTANGLE_HEIGHT + redFood.picture->h;
+		redFood.eaten = false;
+		redFood.spawnTime = SDL_GetTicks () * 0.001;
+	}
+}
+
+void checkRedFoodTimer ( Game & game , RedFood & redFood ) {
+	double currentTime = SDL_GetTicks () * 0.001;
+
+
+	if ( !redFood.eaten && ( currentTime - redFood.spawnTime > redFood.spawnInterval ) ) {
+		redFood.eaten = true;  
+		redFood.spawnTime = currentTime + 5.0; 
+	}
+}
+
+void redFoodEaten ( Snake & snake , RedFood & redFood , Game & game ) {
+	int snakeFrontX1 = snake.x.get ( 0 ) - snake.halfOfWidth;
+	int snakeFrontX2 = snake.x.get ( 0 ) + snake.halfOfWidth;
+	int snakeFrontY2 = snake.y.get ( 0 ) + snake.halfOfWidth;
+	int snakeFrontY1 = snake.y.get ( 0 ) - snake.halfOfWidth;
+	int foodX1 = redFood.x - redFood.picture->w / 2;
+	int foodX2 = redFood.x + redFood.picture->w / 2;
+	int foodY1 = redFood.y - redFood.picture->h / 2;
+	int foodY2 = redFood.y + redFood.picture->h / 2;
+	if ( ( ( snakeFrontX1 >= foodX1 && snakeFrontX1 <= foodX2 ) ||
+		   ( snakeFrontX2 >= foodX1 && snakeFrontX2 <= foodX2 ) ) &&
+		 ( snakeFrontY2 >= foodY1 && snakeFrontY1 <= foodY2 ) && !redFood.eaten) {
+		if ( rand () % 2 == 0 && snake.bodySize > 2)
+			snake.eatenRedFood = true;
+		else
+			snake.snakeDelay += snake.snakeDelay * 0.05;
+		redFood.eaten = true;
+		
+	}
+}
+
+void drawProgressBar ( Game & game , RedFood & redFood ) {
+	if(!redFood.eaten){
+		double elapsed = SDL_GetTicks () * 0.001 - redFood.spawnTime;
+		double progress = ( 1.0 - elapsed / redFood.spawnInterval );
+
+		int barWidth = 200; // Width of the progress bar
+		int barHeight = 10; // Height of the progress bar
+		int x = ( game.SCREEN_WIDTH - barWidth ) / 2;
+		int y = game.RECTANGLE_HEIGHT;
+
+		// Draw the outline of the progress bar
+		SDLUtils::DrawRectangle ( game.screen , x , y , barWidth , barHeight , game.grey , game.black );
+
+		// Draw the filled portion of the progress bar
+		SDLUtils::DrawRectangle ( game.screen , x , y , ( int ) ( barWidth * progress ) , barHeight , game.red , game.red );
+	}
+}
+
 void reSizeSnake ( Snake & snake ) {
 	if(snake.eatenBlueFood){
 		snake.eatenBlueFood = false;
@@ -508,8 +562,22 @@ void reSizeSnake ( Snake & snake ) {
 		snake.y.push ( newTaily );
 		snake.directionX.push ( snake.directionX.get ( snake.bodySize - 2 ) );
 		snake.directionY.push ( snake.directionY.get ( snake.bodySize - 2 ) );
-		snake.turn.push ( false,snake.bodySize-2 );
+		if(snake.turning )
+			snake.turn.push ( true );
+		else
+			snake.turn.push ( false );
+		snake.turn.push ( false ,snake.bodySize-2 );
 		snake.turnsTOdo.push ( snake.turnsTOdo.get ( snake.bodySize - 2 ) );
+	}
+	if ( snake.eatenRedFood ) {
+		snake.eatenRedFood = false;
+		snake.x.pop ( snake.bodySize - 1 );
+		snake.y.pop ( snake.bodySize - 1 );
+		snake.directionX.pop ( snake.bodySize - 1 );
+		snake.directionY.pop ( snake.bodySize - 1 );
+		snake.turn.pop ( snake.bodySize - 1 );
+		snake.turnsTOdo.pop ( snake.bodySize - 1 );
+		snake.bodySize--;
 	}
 }
 
@@ -520,6 +588,12 @@ void printFood ( Game & game , BlueFood & blueFood , RedFood & redFood ) {
 		SDLUtils::DrawSurface ( game.screen , redFood.picture , redFood.x , redFood.y );
 }
 
+void speedChange ( Game & game , Snake & snake ) {
+	if ( game.worldTime - game.lastSpeedchange > game.speedUpInterval ) {
+		game.lastSpeedchange = game.worldTime;
+		snake.snakeDelay = (int)(snake.snakeDelay * (1 -game.speedUpValue));
+	}
+}
 
 void loop (Game&game, Snake&snake, BlueFood&blueFood, RedFood&redFood) {
 	game.startTime = SDL_GetTicks ();
@@ -530,7 +604,7 @@ void loop (Game&game, Snake&snake, BlueFood&blueFood, RedFood&redFood) {
 		game.startTime = game.endTime;
 
 		game.worldTime += game.deltaTime;
-
+		speedChange ( game , snake );
 		SDL_FillRect ( game.screen , NULL , game.black );
 
 
@@ -543,10 +617,14 @@ void loop (Game&game, Snake&snake, BlueFood&blueFood, RedFood&redFood) {
 		printInfo ( game );
 		printBoard ( game);
 		spawnBlueFood ( game , blueFood , snake);
+		checkRedFoodTimer ( game , redFood );
+		spawnRedFood ( game , redFood );
+		drawProgressBar ( game , redFood );
 		printFood ( game , blueFood , redFood );
 		ifHitWall ( snake , game );
 		moveSnake ( snake , game );
 		blueFoodEaten ( snake , blueFood , game );
+		redFoodEaten ( snake , redFood , game );
 		reSizeSnake ( snake );
 		getInput ( snake , game );
 		turnSnake ( snake , game );

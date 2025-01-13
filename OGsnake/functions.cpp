@@ -56,4 +56,4 @@ namespace SDLUtils {
             DrawLine ( screen , x + 1 , i , l - 2 , 1 , 0 , fillColor );
     }
 
-}  // namespace SDLUtils
+} 
