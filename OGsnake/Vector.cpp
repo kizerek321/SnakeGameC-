@@ -70,4 +70,4 @@ Vector<Type>::~Vector() {
 }
 template class Vector<bool>;
 template class Vector<int>;
-template class Vector<Turn>;
+template class Vector<Cell>;

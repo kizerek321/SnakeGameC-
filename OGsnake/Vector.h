@@ -1,7 +1,6 @@
 #pragma once
-struct Turn {
+struct Cell {
 	int x , y;
-	int pastDX , pastDY; //old direction to change snake's skin
 };
 template <typename Type> class Vector { 
 private:
