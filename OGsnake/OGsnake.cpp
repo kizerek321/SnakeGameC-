@@ -3,10 +3,24 @@
 #include "functions.h"
 #include "Vector.h"
 
+#define LEFT_WALL 0
+#define HEAD 0
+#define NONE 0
+#define TOP_WALL 2
+#define UP -1
+#define DOWN 1
+#define RIGHT 1
+#define LEFT -1
+#define BAR_WIDTH 200
+#define BAR_HEIGHT 10
+#define BAR_Y 55
+#define TIME_CONVERTER 0.001
+#define FIVE_PERCENT 0.05
+
 struct Snake {
     Vector<Cell> body;
-    int directionX = 0;  // 1 = right, -1 = left, 0 = none
-    int directionY = -1; // 1 = down, -1 = up, 0 = none
+    int directionX = NONE;  
+    int directionY = UP; 
 	double lastMoveTime = 0.0;
 	double snakeDelay = 130.0;
 	int bodySize = 3;
@@ -24,7 +38,7 @@ struct RedFood {
     bool eaten = true;
 	Cell position;
     double spawnTime = 0.0;
-    double spawnInterval = 5.0;
+    double spawnInterval = 8.0;
 };
 
 struct Game {
@@ -70,7 +84,6 @@ void printInfo ( Game & game, Snake&snake ) {
 }
 
 void drawCell ( SDL_Surface * screen , int x , int y , int size , Uint32 color ) {
-    SDLUtils::DrawRectangle ( screen , x * size , y * size , size , size , color , color );
 }
 
 void initGame ( Game & game ) {
@@ -91,24 +104,24 @@ void updateSnake ( Snake & snake ) {
     for ( int i = snake.body.getCurrentSize () - 1; i > 0; --i ) {
         snake.body.push ( snake.body.get ( i - 1 ) , i );
     }
-    snake.body.push ( { snake.body.get ( 0 ).x + snake.directionX, snake.body.get ( 0 ).y + snake.directionY } , 0 );
+    snake.body.push ( { snake.body.get ( HEAD ).x + snake.directionX, snake.body.get ( HEAD ).y + snake.directionY } , HEAD );
 }
 
 bool checkWallHit ( Snake & snake , Game & game ) {
-	Cell head = snake.body.get ( 0 );
-	if ( head.x + snake.directionX < 0 && snake.directionX == -1 )
+	Cell head = snake.body.get ( HEAD );
+	if ( head.x + snake.directionX < LEFT_WALL && snake.directionX == LEFT )
         return true;
-    if( head.x + snake.directionX >= game.cols && snake.directionX == 1)
+    if( head.x + snake.directionX >= game.cols && snake.directionX == RIGHT)
         return true;
-    if( head.y + snake.directionY <= 2 && snake.directionY == -1)
+    if( head.y + snake.directionY <= TOP_WALL && snake.directionY == UP)
         return true;
-    if( head.y + snake.directionY >= game.rows && snake.directionY == 1 )
+    if( head.y + snake.directionY >= game.rows && snake.directionY == DOWN )
         return true;
 	return false;
 }
 
 bool checkCollision ( Snake & snake , Game & game ) {
-    Cell head = snake.body.get ( 0 );
+    Cell head = snake.body.get ( HEAD );
     for ( int i = 1; i < snake.body.getCurrentSize (); ++i ) {
         if ( snake.body.get ( i ).x == head.x && snake.body.get ( i ).y == head.y ) return true;
     }
@@ -120,13 +133,13 @@ void hitWall ( Snake & snake, Game&game ) {
         game.userTurn = false;
         return;
     }
-	Cell head = snake.body.get ( 0 );
+	Cell head = snake.body.get ( HEAD );
     int rightDirectionX = -snake.directionY; // turn of 90 deegrees so x=-y, y=x
 	int rightDirectionY = snake.directionX;
 	int leftDX = snake.directionY;
     int leftDY = -snake.directionX;
 	Cell rightCellCheck = { head.x + rightDirectionX, head.y + rightDirectionY };
-    bool canTurnRight = ( rightCellCheck.x >= 0 && rightCellCheck.x < game.cols && rightCellCheck.y > 2 && rightCellCheck.y < game.rows );
+    bool canTurnRight = ( rightCellCheck.x >= LEFT_WALL && rightCellCheck.x < game.cols && rightCellCheck.y > TOP_WALL && rightCellCheck.y <= game.rows );
     if ( canTurnRight ) {
 		snake.directionX = rightDirectionX;
 		snake.directionY = rightDirectionY;
@@ -143,27 +156,27 @@ void handleInput ( Snake & snake , Game & game ) {
         if ( event.type == SDL_KEYDOWN ) {
             switch ( event.key.keysym.sym ) {
                 case SDLK_UP: 
-                    if ( snake.directionY == 0) { 
-                        snake.directionX = 0; 
-                        snake.directionY = -1; 
+                    if ( snake.directionY == NONE) { 
+                        snake.directionX = NONE; 
+                        snake.directionY = UP; 
 						game.userTurn = true;
                     } break;
                 case SDLK_DOWN:
-                    if ( snake.directionY == 0 ) { 
-                        snake.directionX = 0; 
-                        snake.directionY = 1; 
+                    if ( snake.directionY == NONE ) { 
+                        snake.directionX = NONE; 
+                        snake.directionY = DOWN; 
                         game.userTurn = true;
                     } break;
                 case SDLK_LEFT: 
-                    if ( snake.directionX == 0 ) { 
-                        snake.directionX = -1; 
-                        snake.directionY = 0;
+                    if ( snake.directionX == NONE ) { 
+                        snake.directionX = LEFT; 
+                        snake.directionY = NONE;
                         game.userTurn = true;
                     } break;
                 case SDLK_RIGHT: 
-                    if ( snake.directionX == 0 ) { 
-                        snake.directionX = 1; 
-                        snake.directionY = 0;
+                    if ( snake.directionX == NONE ) { 
+                        snake.directionX = RIGHT; 
+                        snake.directionY = NONE;
                         game.userTurn = true;
                     } break;
                 case SDLK_n:
@@ -181,7 +194,7 @@ void handleInput ( Snake & snake , Game & game ) {
 bool foodSpawnInSnake ( Snake & snake , BlueFood & blueFood ) {
     for ( int i = 0; i < snake.bodySize; i++ ) {
 		Cell snakeC = snake.body.get ( i );
-        if ( snakeC.x == blueFood.position.x && snakeC.y >= blueFood.position.y ) {
+        if ( snakeC.x == blueFood.position.x && snakeC.y == blueFood.position.y ) {
             return true;
         }
     }
@@ -203,7 +216,7 @@ void spawnBlueFood ( Game & game , BlueFood & blueFood , Snake & snake ) {
 }
 
 void blueFoodEaten ( Snake & snake , BlueFood & blueFood , Game & game ) {
-	Cell head = snake.body.get ( 0 );
+	Cell head = snake.body.get ( HEAD );
     if ( head.x == blueFood.position.x && head.y == blueFood.position.y ) {
         blueFood.eaten = true;
         blueFood.number = 0;
@@ -214,38 +227,28 @@ void blueFoodEaten ( Snake & snake , BlueFood & blueFood , Game & game ) {
 }
 
 void spawnRedFood ( Game & game , RedFood & redFood ) {
-    double currentTime = SDL_GetTicks () * 0.001;
+    double currentTime = SDL_GetTicks () * TIME_CONVERTER;
 
 
     if ( !redFood.eaten && ( currentTime - redFood.spawnTime > redFood.spawnInterval ) ) {
         redFood.eaten = true;
-        redFood.spawnTime = currentTime + 5.0;
+        redFood.spawnTime = currentTime + redFood.spawnInterval;
     }
-    if ( redFood.eaten && SDL_GetTicks () * 0.001 - redFood.spawnTime > redFood.spawnInterval ) {
+    if ( redFood.eaten && SDL_GetTicks () * TIME_CONVERTER - redFood.spawnTime > redFood.spawnInterval ) {
         redFood.position.x = rand () % ( game.cols );
-        redFood.position.y = rand () % ( game.rows - 3) + 3;
+        redFood.position.y = rand () % ( game.rows - game.rectangleHeight / game.cellSize) + game.rectangleHeight / game.cellSize;
         redFood.eaten = false;
-        redFood.spawnTime = SDL_GetTicks () * 0.001;
-    }
-}
-
-void checkRedFoodTimer ( Game & game , RedFood & redFood ) {
-    double currentTime = SDL_GetTicks () * 0.001;
-
-
-    if ( !redFood.eaten && ( currentTime - redFood.spawnTime > redFood.spawnInterval ) ) {
-        redFood.eaten = true;
-        redFood.spawnTime = currentTime + 5.0;
+        redFood.spawnTime = SDL_GetTicks () * TIME_CONVERTER;
     }
 }
 
 void redFoodEaten ( Snake & snake , RedFood & redFood , Game & game ) {
-	Cell head = snake.body.get ( 0 );
-    if ( head.x == redFood.position.x && head.y == redFood.position.y ) {
+	Cell head = snake.body.get ( HEAD );
+    if ( head.x == redFood.position.x && head.y == redFood.position.y && !redFood.eaten ) {
         if ( rand () % 2 == 0 && snake.bodySize > 2 )
             snake.bodySize--;
         else
-            snake.snakeDelay += snake.snakeDelay * 0.05;
+            snake.snakeDelay += snake.snakeDelay * FIVE_PERCENT;
         redFood.eaten = true;
 
     }
@@ -253,15 +256,11 @@ void redFoodEaten ( Snake & snake , RedFood & redFood , Game & game ) {
 
 void drawProgressBar ( Game & game , RedFood & redFood ) {
     if ( !redFood.eaten ) {
-        double elapsed = SDL_GetTicks () * 0.001 - redFood.spawnTime;
+        double elapsed = SDL_GetTicks () * TIME_CONVERTER - redFood.spawnTime;
         double progress = ( 1.0 - elapsed / redFood.spawnInterval );
-
-        int barWidth = 200; 
-        int barHeight = 10; 
-        int x = ( game.screenWidth - barWidth ) / 2;
-        int y = game.rectangleHeight - 2;
-        SDLUtils::DrawRectangle ( game.screen , x , y , barWidth , barHeight , game.black , game.black );
-        SDLUtils::DrawRectangle ( game.screen , x , y , ( int ) ( barWidth * progress ) , barHeight , game.red , game.red );
+        int x = ( game.screenWidth - BAR_WIDTH ) / 2;
+        SDLUtils::DrawRectangle ( game.screen , x , BAR_Y , BAR_WIDTH , BAR_HEIGHT , game.black , game.black );
+        SDLUtils::DrawRectangle ( game.screen , x , BAR_Y , ( int ) ( BAR_WIDTH * progress ) , BAR_HEIGHT , game.red , game.red );
     }
 }
 
@@ -289,7 +288,7 @@ void render ( Game & game , Snake & snake, BlueFood&blueFood, RedFood&redFood ) 
     }
     for ( int i = 0; i < snake.body.getCurrentSize (); ++i ) {
         Cell cell = snake.body.get ( i );
-        drawCell ( game.screen , cell.x , cell.y , game.cellSize , game.snakeColor );
+        SDLUtils::DrawRectangle ( game.screen , cell.x * game.cellSize , cell.y * game.cellSize , game.cellSize , game.cellSize , game.snakeColor , game.snakeColor );
     }
     printInfo ( game ,snake);
 	drawProgressBar ( game , redFood );
