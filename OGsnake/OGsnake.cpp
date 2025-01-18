@@ -22,7 +22,7 @@ struct Snake {
     int directionX = NONE;  
     int directionY = UP; 
 	double lastMoveTime = 0.0;
-	double snakeDelay = 130.0;
+	double delay = 130.0;
 	int bodySize = 3;
 };
 
@@ -75,11 +75,11 @@ void setColors ( Game & game ) {
 void printInfo ( Game & game, Snake&snake ) {
     char text[128];
     SDLUtils::DrawRectangle ( game.screen , 0 , 0 , game.screenWidth , game.rectangleHeight , game.red , game.blue );
-    sprintf ( text , "time = %.1lf s  implemented points: 1,2,3,4" , game.worldTime );
+    sprintf ( text , "time = %.1lf s  implemented points: 1,2,3,4,A,B,C,D" , game.worldTime );
     SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 10 , text , game.charset );
     sprintf ( text , "Esc - exit, n - new game, \x18 up, \x1B left, \x1A down, \x19 right" );
     SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 26 , text , game.charset );
-    sprintf ( text , "points - %d body_size: %d" , game.points, snake.bodySize );
+    sprintf ( text , "points - %d snake size: %d snake delay: %.2f" , game.points, snake.bodySize, snake.delay );
     SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 42 , text , game.charset );
 }
 
@@ -248,9 +248,9 @@ void redFoodEaten ( Snake & snake , RedFood & redFood , Game & game ) {
         if ( rand () % 2 == 0 && snake.bodySize > 2 )
             snake.bodySize--;
         else
-            snake.snakeDelay += snake.snakeDelay * FIVE_PERCENT;
+            snake.delay += snake.delay * FIVE_PERCENT;
         redFood.eaten = true;
-
+		game.points++;
     }
 }
 
@@ -267,7 +267,7 @@ void drawProgressBar ( Game & game , RedFood & redFood ) {
 void speedChange ( Game & game , Snake & snake ) {
     if ( game.worldTime - game.lastSpeedchange > game.speedUpInterval ) {
         game.lastSpeedchange = game.worldTime;
-        snake.snakeDelay = ( int ) ( snake.snakeDelay * ( 1 - game.speedUpValue ) );
+        snake.delay = ( int ) ( snake.delay * ( 1 - game.speedUpValue ) );
     }
 }
 
@@ -336,7 +336,7 @@ void gameLoop ( Game & game , Snake & snake, BlueFood& bluefood, RedFood& redFoo
 
         game.worldTime += game.deltaTime;
 
-        if ( SDL_GetTicks () - snake.lastMoveTime > snake.snakeDelay ) {
+        if ( SDL_GetTicks () - snake.lastMoveTime > snake.delay ) {
             updateSnake ( snake );
             if ( checkCollision ( snake , game ) ) {
                 while ( !game.gameOver ) {
@@ -385,8 +385,7 @@ int main ( int argc , char ** argv ) {
         SDL_FreeSurface ( game.screen );
         SDL_DestroyRenderer ( game.renderer );
         SDL_DestroyWindow ( game.window );
-        SDL_Quit ();
     }
-
+    SDL_Quit ();
     return 0;
 }
