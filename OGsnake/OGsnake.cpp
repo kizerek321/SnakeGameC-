@@ -13,7 +13,7 @@
 #define LEFT -1
 #define BAR_WIDTH 200
 #define BAR_HEIGHT 10
-#define BAR_Y 55
+#define BAR_Y 50
 #define TIME_CONVERTER 0.001
 #define FIVE_PERCENT 0.05
 
@@ -83,9 +83,6 @@ void printInfo ( Game & game, Snake&snake ) {
     SDLUtils::DrawString ( game.screen , game.screen->w / 2 - strlen ( text ) * 8 / 2 , 42 , text , game.charset );
 }
 
-void drawCell ( SDL_Surface * screen , int x , int y , int size , Uint32 color ) {
-}
-
 void initGame ( Game & game ) {
     game.rows = game.screenHeight / game.cellSize;
     game.cols = game.screenWidth / game.cellSize;
@@ -100,11 +97,14 @@ void initSnake ( Snake & snake , Game & game ) {
 	}
 }
 
-void updateSnake ( Snake & snake ) {
-    for ( int i = snake.body.getCurrentSize () - 1; i > 0; --i ) {
-        snake.body.push ( snake.body.get ( i - 1 ) , i );
+void moveSnake ( Snake & snake ) {
+    if ( SDL_GetTicks () - snake.lastMoveTime > snake.delay ) {
+        for ( int i = snake.body.getCurrentSize () - 1; i > 0; --i ) {
+            snake.body.push ( snake.body.get ( i - 1 ) , i );
+        }
+        snake.body.push ( { snake.body.get ( HEAD ).x + snake.directionX, snake.body.get ( HEAD ).y + snake.directionY } , HEAD );
+        snake.lastMoveTime = SDL_GetTicks ();
     }
-    snake.body.push ( { snake.body.get ( HEAD ).x + snake.directionX, snake.body.get ( HEAD ).y + snake.directionY } , HEAD );
 }
 
 bool checkWallHit ( Snake & snake , Game & game ) {
@@ -139,7 +139,7 @@ void hitWall ( Snake & snake, Game&game ) {
 	int leftDX = snake.directionY;
     int leftDY = -snake.directionX;
 	Cell rightCellCheck = { head.x + rightDirectionX, head.y + rightDirectionY };
-    bool canTurnRight = ( rightCellCheck.x >= LEFT_WALL && rightCellCheck.x < game.cols && rightCellCheck.y > TOP_WALL && rightCellCheck.y <= game.rows );
+    bool canTurnRight = ( rightCellCheck.x >= LEFT_WALL && rightCellCheck.x < game.cols && rightCellCheck.y > TOP_WALL && rightCellCheck.y < game.rows );
     if ( canTurnRight ) {
 		snake.directionX = rightDirectionX;
 		snake.directionY = rightDirectionY;
@@ -228,8 +228,6 @@ void blueFoodEaten ( Snake & snake , BlueFood & blueFood , Game & game ) {
 
 void spawnRedFood ( Game & game , RedFood & redFood ) {
     double currentTime = SDL_GetTicks () * TIME_CONVERTER;
-
-
     if ( !redFood.eaten && ( currentTime - redFood.spawnTime > redFood.spawnInterval ) ) {
         redFood.eaten = true;
         redFood.spawnTime = currentTime + redFood.spawnInterval;
@@ -333,28 +331,22 @@ void gameLoop ( Game & game , Snake & snake, BlueFood& bluefood, RedFood& redFoo
         game.endTime = SDL_GetTicks ();
         game.deltaTime = ( game.endTime - game.startTime ) * 0.001;
         game.startTime = game.endTime;
-
         game.worldTime += game.deltaTime;
-
-        if ( SDL_GetTicks () - snake.lastMoveTime > snake.delay ) {
-            updateSnake ( snake );
-            if ( checkCollision ( snake , game ) ) {
-                while ( !game.gameOver ) {
-                    printFinalInfo ( game );
-                    handleInput ( snake , game );
-                }
-            }
-			if ( checkWallHit ( snake , game ) ) {
-				hitWall ( snake , game);
-			}
-            snake.lastMoveTime = SDL_GetTicks();
-            game.userTurn = false;
+        if ( checkWallHit ( snake , game ) ) {
+            hitWall ( snake , game );
         }
+        if ( checkCollision ( snake , game ) ) {
+            while ( !game.gameOver ) {
+                printFinalInfo ( game );
+                handleInput ( snake , game );
+            }
+        }
+        moveSnake ( snake );
+        handleInput ( snake , game );
 		spawnBlueFood ( game , bluefood , snake );
 		blueFoodEaten ( snake , bluefood , game );
 		spawnRedFood ( game , redFood );
 		redFoodEaten ( snake , redFood , game );
-        handleInput ( snake , game );
 		speedChange ( game , snake );
         render ( game , snake, bluefood, redFood );
     }
