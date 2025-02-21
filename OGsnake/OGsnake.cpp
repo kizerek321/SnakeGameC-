@@ -231,6 +231,7 @@ void spawnRedFood ( Game & game , RedFood & redFood ) {
     if ( !redFood.eaten && ( currentTime - redFood.spawnTime > redFood.spawnInterval ) ) {
         redFood.eaten = true;
         redFood.spawnTime = currentTime + redFood.spawnInterval;
+        game.points--;
     }
     if ( redFood.eaten && SDL_GetTicks () * TIME_CONVERTER - redFood.spawnTime > redFood.spawnInterval ) {
         redFood.position.x = rand () % ( game.cols );
@@ -250,6 +251,7 @@ void redFoodEaten ( Snake & snake , RedFood & redFood , Game & game ) {
         redFood.eaten = true;
 		game.points++;
     }
+    
 }
 
 void drawProgressBar ( Game & game , RedFood & redFood ) {
